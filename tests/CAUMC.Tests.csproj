@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework><OutputType>Exe</OutputType>
+    <LangVersion>13.0</LangVersion><ImplicitUsings>enable</ImplicitUsings><Nullable>enable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+</Project>

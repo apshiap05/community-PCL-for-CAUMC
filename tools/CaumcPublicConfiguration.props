@@ -1,0 +1,6 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <!-- Public application identifier registered for PCL for CAUMC; not a secret. -->
+    <CaumcDefaultMicrosoftClientId>de157e10-a9bf-4ceb-afb3-069155607c76</CaumcDefaultMicrosoftClientId>
+  </PropertyGroup>
+</Project>

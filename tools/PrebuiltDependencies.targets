@@ -1,0 +1,10 @@
+<Project>
+  <!-- Optional portable-MSBuild mode: build SDK projects with dotnet first. -->
+  <ItemGroup>
+    <ProjectReference Remove="@(ProjectReference)" />
+    <Reference Include="PCLCS"><HintPath>$(MSBuildProjectDirectory)\..\PCLCS\bin\PCLCS.dll</HintPath></Reference>
+    <Reference Include="MeloongCore"><HintPath>$(MSBuildProjectDirectory)\..\PCLCS\bin\MeloongCore.dll</HintPath></Reference>
+    <Reference Include="MeloongCore.Wpf"><HintPath>$(MSBuildProjectDirectory)\..\PCLCS\bin\MeloongCore.Wpf.dll</HintPath></Reference>
+    <Reference Include="netstandard"><HintPath>$(TargetFrameworkRootPath)\.NETFramework\v4.8\Facades\netstandard.dll</HintPath></Reference>
+  </ItemGroup>
+</Project>

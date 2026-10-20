@@ -1,0 +1,672 @@
+<!doctype html>
+<html lang="zh-cn" data-theme="light">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+  <title>MOD服务器指南</title>
+  <meta name="keywords" content="" />
+  <meta name="description" content="🎯 caumc月常轮换服 · 玩家使用指南 Minecraft 1.20.1 × Forge × TaCZ × Delta Force-Operations
+本期整合包使用指南
+先附上测试视频 🚀 30 秒看懂如何进服 项目
+你需要知道的事 服务器名称
+caumc月常轮换服 服务器地址
+mod.caumc.cn（整合包的多人游戏列表已预置；如未显示，可手动添加） 游戏版本
+Minecraft Ja..." />
+  <base href="https://doc.caumc.cn/" />
+  <link rel="alternate" title="RSS" href="https://doc.caumc.cn/rss.php" type="application/rss+xml" />
+  <link href="https://doc.caumc.cn/content/templates/docu/css/style.css?t=1.3.5" rel="stylesheet" type="text/css" />
+  <link href="https://doc.caumc.cn/content/templates/docu/css/main.css?t=1.3.5" rel="stylesheet" type="text/css" />
+  <link href="https://doc.caumc.cn/content/templates/docu/fancybox/fancybox.css?t=1.3.5" rel="stylesheet" type="text/css" />
+  <script src="https://doc.caumc.cn/content/templates/docu/js/jquery.min.3.5.1.js?t=1.3.5"></script>
+  <script src="https://doc.caumc.cn/content/templates/docu/js/jquery.js?t=1.3.5"></script>
+  <script src="https://doc.caumc.cn/content/templates/docu/js/jquery.pjax.js?t=1.3.5"></script>
+  <script src="https://doc.caumc.cn/content/templates/docu/fancybox/fancybox.umd.js?t=1.3.5"></script>
+  <script>
+    // 传递默认主题模式设置给JavaScript
+    window.defaultThemeMode = 'light';
+  </script>
+    <link href="https://doc.caumc.cn/content/uploadfile/202610/6ab01792243144.jpg" rel="icon">
+</head>
+
+<body>
+  <div id="__docusaurus">
+    <nav aria-label="主导航" class="navbar navbar--fixed-top">
+      <div class="navbar__inner">
+        <div class="navbar__items">
+          <button
+            aria-label="切换导航栏"
+            aria-expanded="false"
+            class="navbar__toggle clean-btn"
+            type="button">
+            <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+              <path
+                stroke="currentColor"
+                stroke-linecap="round"
+                stroke-miterlimit="10"
+                stroke-width="2"
+                d="M4 7h22M4 15h22M4 23h22"></path>
+            </svg>
+          </button>
+          <a class="navbar__brand" href="https://doc.caumc.cn/" title="建造你的世界">
+            <div class="navbar__logo">
+                          </div>
+                          <b class="navbar__title text--truncate">CAUMCYT帮助文档</b>
+                      </a>
+                  </div>
+        <div class="navbar__items navbar__items--right">
+                  <a href="https://doc.caumc.cn/admin" title="管理" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link">管理<svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU">
+                <path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path>
+            </svg></a>
+            <a href="" title="" target="_blank" rel="noopener noreferrer" class="navbar__item navbar__link"><svg width="13.5" height="13.5" aria-hidden="true" viewBox="0 0 24 24" class="iconExternalLink_nPIU">
+                <path fill="currentColor" d="M21 13v10h-21v-19h12v2h-10v15h17v-8h2zm3-12h-10.988l4.035 4-6.977 7.07 2.828 2.828 6.977-7.07 4.125 4.172v-11z"></path>
+            </svg></a>
+                  <div class="toggle_vylO colorModeToggle_DEke"><button class="clean-btn toggleButton_gllP" type="button" title="切换浅色/暗黑模式（当前为浅色模式）" aria-label="切换浅色/暗黑模式（当前为浅色模式）" aria-live="polite" aria-pressed="false"><svg viewBox="0 0 24 24" width="24" height="24" class="lightToggleIcon_pyhR">
+                <path fill="currentColor" d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+              </svg><svg viewBox="0 0 24 24" width="24" height="24" class="darkToggleIcon_wfgR">
+                <path fill="currentColor" d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+              </svg></button></div>
+        </div>
+        <input type="text" id="searchInput" placeholder="搜索..." class="form-control">
+      </div>
+      <div role="presentation" class="navbar-sidebar__backdrop"></div>
+      <div class="navbar-sidebar">
+        <div class="navbar-sidebar__brand">
+          <a class="navbar__brand" href="https://doc.caumc.cn/" title="建造你的世界">
+            <div class="navbar__logo">
+                          </div>
+                          <b class="navbar__title text--truncate">CAUMCYT帮助文档</b>
+                      </a>
+          <div class="toggle_vylO margin-right--md">
+            <button
+              class="clean-btn toggleButton_gllP"
+              type="button"
+              title="切换浅色/暗黑模式（当前为浅色模式）"
+              aria-label="切换浅色/暗黑模式（当前为浅色模式）"
+              aria-live="polite"
+              aria-pressed="false">
+              <svg
+                viewBox="0 0 24 24"
+                width="24"
+                height="24"
+                class="lightToggleIcon_pyhR">
+                <path
+                  fill="currentColor"
+                  d="M12,9c1.65,0,3,1.35,3,3s-1.35,3-3,3s-3-1.35-3-3S10.35,9,12,9 M12,7c-2.76,0-5,2.24-5,5s2.24,5,5,5s5-2.24,5-5 S14.76,7,12,7L12,7z M2,13l2,0c0.55,0,1-0.45,1-1s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S1.45,13,2,13z M20,13l2,0c0.55,0,1-0.45,1-1 s-0.45-1-1-1l-2,0c-0.55,0-1,0.45-1,1S19.45,13,20,13z M11,2v2c0,0.55,0.45,1,1,1s1-0.45,1-1V2c0-0.55-0.45-1-1-1S11,1.45,11,2z M11,20v2c0,0.55,0.45,1,1,1s1-0.45,1-1v-2c0-0.55-0.45-1-1-1C11.45,19,11,19.45,11,20z M5.99,4.58c-0.39-0.39-1.03-0.39-1.41,0 c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0s0.39-1.03,0-1.41L5.99,4.58z M18.36,16.95 c-0.39-0.39-1.03-0.39-1.41,0c-0.39,0.39-0.39,1.03,0,1.41l1.06,1.06c0.39,0.39,1.03,0.39,1.41,0c0.39-0.39,0.39-1.03,0-1.41 L18.36,16.95z M19.42,5.99c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06c-0.39,0.39-0.39,1.03,0,1.41 s1.03,0.39,1.41,0L19.42,5.99z M7.05,18.36c0.39-0.39,0.39-1.03,0-1.41c-0.39-0.39-1.03-0.39-1.41,0l-1.06,1.06 c-0.39,0.39-0.39,1.03,0,1.41s1.03,0.39,1.41,0L7.05,18.36z"></path>
+              </svg><svg
+                viewBox="0 0 24 24"
+                width="24"
+                height="24"
+                class="darkToggleIcon_wfgR">
+                <path
+                  fill="currentColor"
+                  d="M9.37,5.51C9.19,6.15,9.1,6.82,9.1,7.5c0,4.08,3.32,7.4,7.4,7.4c0.68,0,1.35-0.09,1.99-0.27C17.45,17.19,14.93,19,12,19 c-3.86,0-7-3.14-7-7C5,9.07,6.81,6.55,9.37,5.51z M12,3c-4.97,0-9,4.03-9,9s4.03,9,9,9s9-4.03,9-9c0-0.46-0.04-0.92-0.1-1.36 c-0.98,1.37-2.58,2.26-4.4,2.26c-2.98,0-5.4-2.42-5.4-5.4c0-1.81,0.89-3.42,2.26-4.4C12.92,3.04,12.46,3,12,3L12,3z"></path>
+              </svg>
+            </button>
+          </div>
+          <button
+            type="button"
+            aria-label="关闭导航栏"
+            class="clean-btn navbar-sidebar__close">
+            <svg viewBox="0 0 15 15" width="21" height="21">
+              <g stroke="var(--ifm-color-emphasis-600)" stroke-width="1.2">
+                <path d="M.75.75l13.5 13.5M14.25.75L.75 14.25"></path>
+              </g>
+            </svg>
+          </button>
+        </div>
+        <div class="navbar-sidebar__items navbar-sidebar__items--show-secondary">
+          <div class="navbar-sidebar__item menu">
+            <ul class="menu__list">
+                      <li class="menu__list-item">
+            <a href="https://doc.caumc.cn/admin" title="管理" target="_blank" rel="noopener noreferrer" class="menu__link">管理</a>
+        </li>
+            <li class="menu__list-item">
+            <a href="" title="" target="_blank" rel="noopener noreferrer" class="menu__link"></a>
+        </li>
+                </ul>
+          </div>
+          <div class="navbar-sidebar__item menu">
+            <button type="button" class="clean-btn navbar-sidebar__back">
+              ← 回到主菜单
+            </button>
+            <ul class="theme-doc-sidebar-menu menu__list">
+              <style>
+    :root {
+        --theme-color: #4E74DF;
+    }
+</style>
+<aside class="theme-doc-sidebar-container">
+    <div class="sidebarViewport_aRkj">
+        <div class="sidebar_njMd">
+            <nav aria-label="文档侧边栏" class="menu thin-scrollbar menu_SIkG">
+                <ul class="theme-doc-sidebar-menu menu__list" id="all-logs">
+                                                            <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=2">
+                     服务器介绍                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=6">
+                     CAUMC 皮肤站使用指南                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link menu__link--active" href="https://doc.caumc.cn/?post=5">
+                     MOD服务器指南                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=3">
+                     方块艺术社 · 20261017百团大战                </a>
+            </li>
+                                                </ul>
+            </nav>
+        </div>
+    </div>
+</aside>            </ul>
+          </div>
+        </div>
+      </div>
+    </nav>
+
+    <!-- 搜索侧边栏 -->
+    <div id="searchSidebar" class="search-sidebar">
+      <div class="search-sidebar-header">
+        <h3>搜索结果</h3>
+        <span class="search-close">&times;</span>
+      </div>
+      <div class="search-sidebar-content">
+        <p>搜索结果将在这里显示。</p>
+      </div>
+    </div>
+
+    <!-- 搜索遮罩层 -->
+    <div id="searchOverlay" class="search-overlay"></div>
+
+    <script>
+      $(document).ready(function() {
+        var sidebar = $('#searchSidebar');
+        var overlay = $('#searchOverlay');
+        var closeBtn = $('.search-close');
+
+        $('#searchInput').keypress(function(event) {
+          if (event.which == 13) { // 检测回车键
+            var query = $(this).val().trim();
+            if (query !== "") {
+              $.ajax({
+                url: './content/templates/docu/search.php',
+                method: 'GET',
+                data: {
+                  keyword: query
+                },
+                dataType: 'json',
+                success: function(response) {
+                  if (response.code === 0 && response.msg === "ok") {
+                    var articles = response.data || [];
+                    if (articles.length === 0) {
+                      $('.search-sidebar-content').html('<p>未找到相关结果。</p>');
+                    } else {
+                      var resultsHtml = '<ul>';
+                      articles.forEach(function(article) {
+                        resultsHtml += '<li>';
+                        resultsHtml += '<a href="' + article.log_url + '" class="search-result-link">' + article.log_title + '</a>';
+                        resultsHtml += '</li>';
+                      });
+                      resultsHtml += '</ul>';
+                      $('.search-sidebar-content').html(resultsHtml);
+                    }
+                  } else {
+                    $('.search-sidebar-content').html('<p>未找到相关结果。</p>');
+                  }
+                  // 显示侧边栏
+                  sidebar.addClass('active');
+                  overlay.addClass('active');
+                  $('body').addClass('search-sidebar-open');
+                },
+                error: function() {
+                  $('.search-sidebar-content').html('<p>搜索失败，请稍后重试。</p>');
+                  sidebar.addClass('active');
+                  overlay.addClass('active');
+                  $('body').addClass('search-sidebar-open');
+                }
+              });
+            }
+          }
+        });
+
+        // 关闭侧边栏
+        function closeSidebar() {
+          sidebar.removeClass('active');
+          overlay.removeClass('active');
+          $('body').removeClass('search-sidebar-open');
+        }
+
+        closeBtn.click(closeSidebar);
+        overlay.click(closeSidebar);
+
+        // 点击搜索结果链接时关闭侧边栏（特别针对移动端）
+        $(document).on('click', '.search-result-link', function() {
+          // 检查是否为移动设备
+          if (window.innerWidth <= 768) {
+            // 延迟关闭，确保链接跳转正常进行
+            setTimeout(function() {
+              closeSidebar();
+            }, 100);
+          }
+        });
+
+        // ESC键关闭
+        $(document).keyup(function(e) {
+          if (e.keyCode === 27) { // ESC键
+            closeSidebar();
+          }
+        });
+      });
+    </script>
+<body data-rh="class" class="navigation-with-keyboard" style="overflow: visible;">
+    <div
+        id="__docusaurus_skipToContent_fallback"
+        class="main-wrapper mainWrapper_z2l0">
+        <div class="docsWrapper_hBAB">
+            <button
+                aria-label="回到顶部"
+                class="clean-btn theme-back-to-top-button backToTopButton_sjWU"
+                type="button"></button>
+            <div class="docRoot_UBD9">
+                <style>
+    :root {
+        --theme-color: #4E74DF;
+    }
+</style>
+<aside class="theme-doc-sidebar-container docSidebarContainer_YfHR">
+    <div class="sidebarViewport_aRkj">
+        <div class="sidebar_njMd">
+            <nav aria-label="文档侧边栏" class="menu thin-scrollbar menu_SIkG">
+                <ul class="theme-doc-sidebar-menu menu__list" id="all-logs">
+                                        <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=2">
+                     服务器介绍                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=6">
+                     CAUMC 皮肤站使用指南                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link menu__link--active" href="https://doc.caumc.cn/?post=5">
+                     MOD服务器指南                </a>
+            </li>
+                                <li class="theme-doc-sidebar-item-link theme-doc-sidebar-item-link-level-1 menu__list-item">
+                <a class="menu__link" href="https://doc.caumc.cn/?post=3">
+                     方块艺术社 · 20261017百团大战                </a>
+            </li>
+                                                </ul>
+            </nav>
+        </div>
+    </div>
+</aside>                <main class="docMainContainer_TBSr">
+                    <div class="container padding-top--md padding-bottom--lg" id="content">
+                        <div class="row">
+                            <div class="col docItemCol_VOVn">
+                                <div class="docItemContainer_Djhp">
+                                    <article>
+                                        <nav
+                                            class="theme-doc-breadcrumbs breadcrumbsContainer_Z_bl"
+                                            aria-label="页面路径">
+                                            <ul
+                                                class="breadcrumbs"
+                                                itemscope=""
+                                                itemtype="https://schema.org/BreadcrumbList">
+                                                <li class="breadcrumbs__item">
+                                                    <a
+                                                        aria-label="主页面"
+                                                        class="breadcrumbs__link"
+                                                        href="https://doc.caumc.cn/"><svg
+                                                            viewBox="0 0 24 24"
+                                                            class="breadcrumbHomeIcon_YNFT">
+                                                            <path
+                                                                d="M10 19v-5h4v5c0 .55.45 1 1 1h3c.55 0 1-.45 1-1v-7h1.7c.46 0 .68-.57.33-.87L12.67 3.6c-.38-.34-.96-.34-1.34 0l-8.36 7.53c-.34.3-.13.87.33.87H5v7c0 .55.45 1 1 1h3c.55 0 1-.45 1-1z"
+                                                                fill="currentColor"></path>
+                                                        </svg></a>
+                                                </li>
+                                                <li
+                                                    itemscope=""
+                                                    itemprop="itemListElement"
+                                                    itemtype="https://schema.org/ListItem"
+                                                    class="breadcrumbs__item breadcrumbs__item--active">
+                                                    <span class="breadcrumbs__link" itemprop="name">MOD服务器指南</span>
+                                                    <meta itemprop="position" content="1" />
+                                                </li>
+                                            </ul>
+                                        </nav>
+                                        <div class="tocCollapsible_ETCw theme-doc-toc-mobile tocMobile_ITEo">
+                                            <button type="button" class="clean-btn tocCollapsibleButton_TO0P">
+                                                本页总览
+                                            </button>
+                                            <div class="tocCollapsibleContent_vkbj">
+                                                <ul class="table-of-contents table-of-contents__left-border anchor-list1">
+
+                                                </ul>
+                                            </div>
+                                        </div>
+                                        <div class="theme-doc-markdown markdown">
+                                            <header>
+                                                <h1>
+                                                                                                        MOD服务器指南                                                </h1>
+                                            </header>
+                                            <h1>🎯 caumc月常轮换服 · 玩家使用指南</h1>
+<blockquote>
+<p>Minecraft 1.20.1 × Forge × TaCZ × Delta Force-Operations<br />
+本期整合包使用指南<br />
+先附上测试视频</p>
+<video class="video-js" controls preload="auto" width="100%" data-setup='{"aspectRatio":"16:9"}'> <source src="https://doc.caumc.cn/content/uploadfile/202610/c5b31792420781.mp4" type='video/mp4' > </video>
+<hr />
+</blockquote>
+<h2>🚀 30 秒看懂如何进服</h2>
+<table>
+<thead>
+<tr>
+<th>项目</th>
+<th>你需要知道的事</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>服务器名称</td>
+<td><strong>caumc月常轮换服</strong></td>
+</tr>
+<tr>
+<td>服务器地址</td>
+<td><code>mod.caumc.cn</code>（整合包的多人游戏列表已预置；如未显示，可手动添加）</td>
+</tr>
+<tr>
+<td>游戏版本</td>
+<td><strong>Minecraft Java 版 1.20.1</strong></td>
+</tr>
+<tr>
+<td>模组加载器</td>
+<td><strong>Forge 47.4.28</strong></td>
+</tr>
+<tr>
+<td>Java</td>
+<td><strong>64 位 Java 17</strong></td>
+</tr>
+<tr>
+<td>启动器</td>
+<td>整合包<strong>自带 PCL2</strong>，选择 <code>1.20.1-Forge_47.4.28</code> 版本</td>
+</tr>
+<tr>
+<td>整合包</td>
+<td>含启动器和游戏文件的<strong>完整 ZIP</strong>；<a href="https://doc.caumc.cn/content/uploadfile/202610/35001792500975.zip">MOD服.zip</a></td>
+</tr>
+<tr>
+<td>参与活动流程</td>
+<td>待定</td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>重要提醒：</strong>这是模组服。请使用服主提供的<strong>完整客户端整合包</strong>，不要只装 Minecraft 1.20.1，也不要随意增删模组或枪包。使用 <code>mod.caumc.cn</code> 进服时，无须自己填写端口。</p>
+</blockquote>
+<h2>📦 安装与第一次启动</h2>
+<ol>
+<li>
+<p><a href="https://doc.caumc.cn/?resource_alias=JB2g45FHfGYNU6Mq&amp;resource_filename=35001792420150">下载完整整合包 ZIP</a>。如果链接无法打开，请在群内联系服主。</p>
+</li>
+<li>
+<p>把 ZIP <strong>完整解压</strong>到你选择的文件夹，例如 <code>D:\Games\CAUMC</code>。不要只解压 <code>mods</code>，也不要直接在压缩包里运行启动器。解压后的文件结构应包含：</p>
+<pre><code class="language-text">整合包文件夹/
+├─ Plain Craft Launcher 2.exe
+└─ .minecraft/
+  └─ versions/
+     └─ 1.20.1-Forge_47.4.28/</code></pre>
+</li>
+<li>
+<p>双击解压目录中的 <code>Plain Craft Launcher 2.exe</code>，选择 <code>1.20.1-Forge_47.4.28</code>。如 PCL 提示下载游戏依赖或 Java，请等待完成；确认使用 <strong>64 位 Java 17</strong>，再启动游戏。建议把整合包放在独立目录，不覆盖你原有的 <code>.minecraft</code>。</p>
+<p><img src="https://doc.caumc.cn/content/uploadfile/202610/c0141792419661.png" alt="PCL2 首次启动示意" /></p>
+</li>
+<li>
+<p>第一次启动需要加载模组和枪械资源，可能比原版慢；请等到主菜单出现。</p>
+</li>
+<li>
+<p><strong>先在群内报名并等管理员确认</strong>。随后打开「多人游戏」，在预置的服务器列表中加入。若列表没有显示服务器，再选择「添加服务器」，地址填 <code>mod.caumc.cn</code>。</p>
+</li>
+</ol>
+<p>整合包中已经包含 TaCZ、Arcana、TaCZ Labs、TaCZ Addon、GunsmithLib 弹药扩展、Distant Horizons，以及配套功能模组。TaCZ 的枪包包含 <strong>Delta Force-Operations V2.0</strong>、<strong>ARIPS 1.3.0</strong> 和默认枪包。不要把这些枪包从整合包的 <code>tacz</code> 目录移走。</p>
+<blockquote>
+<p>📌 <strong>入服提醒：</strong>不要自行替换客户端模组或枪包。</p>
+</blockquote>
+<h2>🎮 按键速查</h2>
+<p>以下按键来自这份整合包的 <code>options.txt</code>，<strong>不是 Minecraft/模组的通用默认键位</strong>。如果你曾重置按键或使用了自己的 <code>options.txt</code>，请以游戏内「选项 → 控制 → 按键绑定」为准。</p>
+<h3>基础移动与界面</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>按键</th>
+<th>操作</th>
+<th>按键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前 / 左 / 后 / 右移动</td>
+<td><code>W</code> / <code>A</code> / <code>S</code> / <code>D</code></td>
+<td>跳跃</td>
+<td><code>空格</code></td>
+</tr>
+<tr>
+<td>潜行</td>
+<td><code>左 Ctrl</code></td>
+<td>疾跑</td>
+<td><code>左 Shift</code></td>
+</tr>
+<tr>
+<td>打开背包</td>
+<td><code>Caps Lock</code></td>
+<td>丢弃物品</td>
+<td><code>G</code></td>
+</tr>
+<tr>
+<td>快捷栏</td>
+<td><code>1</code>–<code>9</code></td>
+<td>聊天</td>
+<td><code>Enter</code></td>
+</tr>
+<tr>
+<td>玩家列表</td>
+<td><code>F12</code></td>
+<td>命令输入</td>
+<td><code>/</code></td>
+</tr>
+<tr>
+<td>截图</td>
+<td><code>F2</code></td>
+<td>切换视角</td>
+<td><code>F5</code></td>
+</tr>
+<tr>
+<td>全屏</td>
+<td><code>F11</code></td>
+<td>进度界面</td>
+<td><code>L</code></td>
+</tr>
+</tbody>
+</table>
+<h3>枪械操作 · TaCZ</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>按键</th>
+<th>操作</th>
+<th>按键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>射击</td>
+<td><code>鼠标左键</code></td>
+<td>瞄准</td>
+<td><code>鼠标右键</code></td>
+</tr>
+<tr>
+<td>换弹</td>
+<td><code>R</code></td>
+<td>切换开火模式</td>
+<td><code>0</code>（主键盘）</td>
+</tr>
+<tr>
+<td>检视枪械</td>
+<td><code>I</code></td>
+<td>枪械改装</td>
+<td><code>P</code></td>
+</tr>
+<tr>
+<td>持枪互动</td>
+<td><code>O</code></td>
+<td>瞄具缩放</td>
+<td><code>V</code></td>
+</tr>
+<tr>
+<td>近战</td>
+<td><code>F</code></td>
+<td>爬行</td>
+<td><code>Z</code></td>
+</tr>
+<tr>
+<td>快速切枪</td>
+<td><code>鼠标侧键 5</code></td>
+<td>弹道计算机</td>
+<td><code>B</code></td>
+</tr>
+<tr>
+<td>切换配件或弹药类型</td>
+<td><code>X</code></td>
+<td>切换弹药</td>
+<td><code>K</code></td>
+</tr>
+<tr>
+<td>切换下挂模式</td>
+<td><code>H</code></td>
+<td>激光开关</td>
+<td><code>Y</code></td>
+</tr>
+<tr>
+<td>战术手电开关</td>
+<td><code>U</code></td>
+<td>扩展动作 1–4</td>
+<td><code>小键盘 1</code>–<code>4</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>扩展动作是否生效，取决于当前枪械、配件及其功能；没有对应功能时按键可能没有反应。鼠标侧键编号会因鼠标驱动而异，可在游戏按键设置中确认。</p>
+</blockquote>
+<h3>战术动作与其他功能</h3>
+<table>
+<thead>
+<tr>
+<th>操作</th>
+<th>按键</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>向左侧头 / 向右侧头</td>
+<td><code>Q</code> / <code>E</code></td>
+</tr>
+<tr>
+<td>打开击杀图标模组配置</td>
+<td><code>=</code></td>
+</tr>
+<tr>
+<td>查看计分板</td>
+<td><code>Tab</code></td>
+</tr>
+<tr>
+<td>社交互动界面</td>
+<td><code>F10</code></td>
+</tr>
+<tr>
+<td>创造模式保存 / 加载快捷工具栏</td>
+<td><code>C</code> / <code>-</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p>⚠️ <strong>按键提醒：</strong>背包是 <code>Caps Lock</code>，计分板是 <code>Tab</code>。当前配置中，原版“攻击”和“使用物品”显示为<strong>未绑定</strong>，枪械的射击、瞄准分别占用了鼠标左键、右键；如果遇到徒手交互不便，请到「选项 → 控制 → 按键绑定」调整。</p>
+</blockquote>
+<h2>🧭 刚进服该做什么？</h2>
+<ol>
+<li>先确认能正常移动、打开背包，以及看到枪械模型和物品名称。</li>
+<li>找到枪械后按 <code>P</code> 查看改装；装上弹匣或弹药后，用 <code>R</code> 换弹。各枪械可用的配件、弹种可能不同。</li>
+<li>用 <code>鼠标右键</code> 瞄准、<code>鼠标左键</code> 射击；想看枪械动作可按 <code>I</code> 检视。</li>
+<li><strong>本期具体玩法、出生点指引和物资获取方式待服主确认</strong>；入服后以群公告为准。</li>
+</ol>
+<h2>🛠️ 常见问题</h2>
+<h3>服务器列表显示无法连接</h3>
+<p>确认输入的是 <code>mod.caumc.cn</code>，没有多余空格或端口；检查网络后刷新服务器列表。若同服其他玩家也无法进入，请联系服主查看服务器状态。</p>
+<h3>提示模组不匹配 / mismatched mod channel list</h3>
+<p>通常是客户端模组与服务器不一致。请重新选择服主发布的完整整合包版本，不要自己增删 <code>mods</code> 中的文件；若仍失败，把报错截图和客户端日志发给管理员。</p>
+<h3>枪械、配件缺失或无法加载</h3>
+<p>确认整合包中的 TaCZ、Arcana、Labs、Addon 和三套枪包均在原位。不要只复制 <code>mods</code> 而漏掉 <code>tacz</code> 目录；缺少扩展或枪包时，部分配件与模型可能加载失败。</p>
+<h3>启动卡住、闪退或帧率低</h3>
+<p>先确认启动器选中 <strong>Java 17</strong>，并等待首次模组加载完成。帧率低时可降低游戏内视距、模拟距离和 Distant Horizons 远景设置；本整合包当前客户端视距与模拟距离均设为 32，低配电脑可自行下调。求助时请附上崩溃报告或 <code>logs/latest.log</code>，不要只发“进不去”。</p>
+<h2>🤝 报名、规则与求助</h2>
+<p>具体规则<strong>尚待确认</strong>，正式规则发布后，请以群公告为准。</p>
+<p>遇到问题时，建议一次说清楚：游戏名、发生时间、做了什么、报错截图，以及是否使用了原版整合包。这样管理员能更快定位。</p>
+<hr />
+<blockquote>
+<p>祝你行动顺利，战场见！ 🎯</p>
+</blockquote>                                                                                    </div>
+                                                                                                                            <div style="margin-top: 2rem; color: #999; font-size: 0.85rem; display: flex; justify-content: space-between; align-items: center;">
+                                                <div>
+                                                                                                                                                        </div>
+                                                <div style="text-align: right;">
+                                                                                                            发布时间：<time datetime="2026-10-19T22:10:48+08:00" itemprop="datePublished">2026-10-19 22:10</time>
+                                                                                                    </div>
+                                            </div>
+                                                                            </article>
+                                    <nav class="pagination-nav docusaurus-mt-lg" aria-label="文件选项卡">
+                                        <a class='pagination-nav__link pagination-nav__link--prev' href='https://doc.caumc.cn/?post=6' title='CAUMC 皮肤站使用指南'><div class="pagination-nav__sublabel">上一篇</div><div class="pagination-nav__label">CAUMC 皮肤站使用指南</div></a><a class='pagination-nav__link pagination-nav__link--next' href='https://doc.caumc.cn/?post=3' title='方块艺术社 · 20261017百'><div class="pagination-nav__sublabel">下一篇</div><div class="pagination-nav__label">方块艺术社 · 20261017百团大战</div></a>                                    </nav>
+                                                                    </div>
+                            </div>
+                            <div class="col col--3">
+                                <div class="tableOfContents_bqdL thin-scrollbar theme-doc-toc-desktop">
+                                    <ul class="table-of-contents table-of-contents__left-border anchor-list2">
+
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+    <footer class="footer">
+    <div style="display: flex; align-items: center; justify-content: center;"></div>
+</footer>
+<script src="https://doc.caumc.cn/content/templates/docu/js/scripts.js?t=1.3.5"></script>
+<script>
+  initCodeHighlight();
+  initializeFancybox();
+
+  $(document).pjax('aside a', '#content', {
+    fragment: '#content',
+    timeout: 3000
+  });
+
+  $(document).on('pjax:send', function() {
+    // 显示加载动画
+  });
+
+  $(document).on('pjax:complete', function() {
+    initCodeHighlight();
+    anchorPageList();
+    initializeFancybox();
+    initCommentFeatures();
+  });
+</script>
+</div>
+</body>
+
+</html>

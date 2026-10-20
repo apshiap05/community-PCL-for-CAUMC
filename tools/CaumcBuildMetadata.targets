@@ -1,0 +1,25 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <!-- Only the public application ID belongs in the distributed executable. -->
+  <Import Project="$(MSBuildThisFileDirectory)CaumcPublicConfiguration.props" />
+  <PropertyGroup>
+    <CaumcMicrosoftClientId Condition="'$(CaumcMicrosoftClientId)' == ''">$(PCL_BUILD_MS_CLIENT_ID)</CaumcMicrosoftClientId>
+    <CaumcMicrosoftClientId Condition="'$(CaumcMicrosoftClientId)' == ''">$(CaumcDefaultMicrosoftClientId)</CaumcMicrosoftClientId>
+  </PropertyGroup>
+  <Target Name="GenerateCaumcBuildMetadata" BeforeTargets="CoreCompile">
+    <Error Condition="'$(CaumcMicrosoftClientId)' != '' And !$([System.Text.RegularExpressions.Regex]::IsMatch('$(CaumcMicrosoftClientId)', '^(?:[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}|[0-9a-fA-F]{16})$'))"
+           Text="CaumcMicrosoftClientId must be a public Microsoft application ID (GUID or 16 hexadecimal characters)." />
+    <ItemGroup>
+      <_CaumcAssemblyAttribute Include="System.Reflection.AssemblyMetadataAttribute">
+        <_Parameter1>CAUMC.MicrosoftClientId</_Parameter1>
+        <_Parameter2>$(CaumcMicrosoftClientId)</_Parameter2>
+        <_Parameter2_TypeName>System.String</_Parameter2_TypeName>
+      </_CaumcAssemblyAttribute>
+      <Compile Remove="$(IntermediateOutputPath)CaumcBuildMetadata.g.vb" />
+    </ItemGroup>
+    <WriteCodeFragment AssemblyAttributes="@(_CaumcAssemblyAttribute)" Language="VisualBasic"
+                       OutputDirectory="$(IntermediateOutputPath)" OutputFile="CaumcBuildMetadata.g.vb">
+      <Output TaskParameter="OutputFile" ItemName="Compile" />
+      <Output TaskParameter="OutputFile" ItemName="FileWrites" />
+    </WriteCodeFragment>
+  </Target>
+</Project>

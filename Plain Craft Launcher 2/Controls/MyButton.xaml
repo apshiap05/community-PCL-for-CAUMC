@@ -1,0 +1,21 @@
+<Border x:Class="MyButton"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:local="clr-namespace:PCL"
+             FocusVisualStyle="{x:Null}" x:Name="PanBack"
+             Focusable="True" UseLayoutRounding="False" SnapsToDevicePixels="False" Background="{StaticResource ColorBrushSemiTransparent}">
+    <Border CornerRadius="{StaticResource GlassControlCorner}" x:Name="PanFore" BorderThickness="{StaticResource GlassBorderThickness}" BorderBrush="{StaticResource GlassControlStroke}" RenderTransformOrigin="0.5,0.5" Background="{StaticResource GlassControlFill}">
+        <Border.RenderTransform>
+            <ScaleTransform />
+        </Border.RenderTransform>
+        <Grid>
+        <local:CaumcGlassSurface x:Name="GlassFace" Material="Control" Radius="{StaticResource GlassControlRadius}" />
+        <Border Background="{Binding Background, ElementName=PanFore}" CornerRadius="{StaticResource GlassControlCorner}" IsHitTestVisible="False" />
+        <TextBlock TextOptions.TextFormattingMode="Display" SnapsToDevicePixels="True" TextTrimming="None" HorizontalAlignment="Center" x:Name="LabText" VerticalAlignment="Center" RenderTransformOrigin="0.5,0.5" Foreground="{DynamicResource ColorBrush1}" FontSize="13" IsHitTestVisible="False">
+            <TextBlock.RenderTransform>
+                <ScaleTransform />
+            </TextBlock.RenderTransform>
+        </TextBlock>
+        </Grid>
+    </Border>
+</Border>
