@@ -4,8 +4,11 @@ $sourceRoot = Split-Path $PSScriptRoot
 $archivePath = [IO.Path]::GetFullPath($OutputPath)
 if (Test-Path -LiteralPath $archivePath) { throw "源码包已存在，请使用新路径：$archivePath" }
 
-$tracked = @(& git -C $sourceRoot -c core.quotepath=false ls-files --recurse-submodules)
-if ($LASTEXITCODE) { throw '无法读取主仓库及子模块文件列表' }
+$tracked = @(& git -C $sourceRoot -c core.quotepath=false ls-files)
+if ($LASTEXITCODE) { throw '无法读取主仓库文件列表' }
+$coreFiles = @(& git -C (Join-Path $sourceRoot 'MeloongCore') -c core.quotepath=false ls-files)
+if ($LASTEXITCODE -or -not $coreFiles.Count) { throw '缺少已初始化的 MeloongCore 子模块' }
+$tracked += @($coreFiles | ForEach-Object { 'MeloongCore/' + $_ })
 $untracked = @(& git -C $sourceRoot -c core.quotepath=false ls-files --others --exclude-standard)
 if ($LASTEXITCODE) { throw '无法读取新增源文件列表' }
 $files = @($tracked + $untracked | Sort-Object -Unique)
@@ -30,6 +33,9 @@ try {
         $input = [IO.File]::OpenRead($path)
         $output = $entry.Open()
         try { $input.CopyTo($output) } finally { $input.Dispose(); $output.Dispose() }
+    }
+    foreach ($required in @('MeloongCore/Shared/MeloongCore.csproj', 'MeloongCore/Wpf/MeloongCore.Wpf.csproj')) {
+        if (-not $manifest.files.Contains($required)) { throw "源码包缺少构建文件：$required" }
     }
     $entry = $zip.CreateEntry('SOURCE-MANIFEST.json')
     $writer = [IO.StreamWriter]::new($entry.Open(), [Text.UTF8Encoding]::new($false))
