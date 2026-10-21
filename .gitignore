@@ -15,6 +15,10 @@ __pycache__/
 *.pyc
 /PCLForCAUMC/
 /CAUMC/
+/PCL/
+/.minecraft/
+/ImportedGames/
+/ImportedPacks/
 /selftest*/
 /selftest-*
 /homepage-preview.png

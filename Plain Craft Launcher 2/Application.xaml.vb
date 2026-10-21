@@ -7,7 +7,7 @@ Public Class Application
     Private Sub Application_Startup(sender As Object, e As StartupEventArgs) Handles Me.Startup
         Try
             '核心初始化
-            MeloongCore.Main.Init("PCLForCAUMC")
+            MeloongCore.Main.Init(If(e.Args.Contains("--caumc-selftest"), "PCLForCAUMCTest", "PCL"))
             MeloongCore.Wpf.Main.Init()
             If e.Args.Contains("--caumc-selftest") Then
                 Logger.Instance = New PclLogger With {.logFolder = Paths.Base & "selftest-logs\", .MinLevel = LogLevel.Info}
@@ -70,14 +70,15 @@ Public Class Application
                     End If
                 End If
             End If
+            CaumcMigrateConfiguration()
             CaumcInitialize()
             '初始化文件结构
             Try
-                DirectoryUtils.Create(Paths.Base & "PCLForCAUMC\Pictures\")
-                DirectoryUtils.Create(Paths.Base & "PCLForCAUMC\Musics\")
-                CheckPermissionWithException(Paths.Base & "PCLForCAUMC\")
+                DirectoryUtils.Create(Paths.Base & "PCL\Pictures\")
+                DirectoryUtils.Create(Paths.Base & "PCL\Musics\")
+                CheckPermissionWithException(Paths.Base & "PCL\")
             Catch ex As Exception
-                MsgBox($"PCL 没有对当前文件夹的权限（{Paths.Base}PCLForCAUMC\），请尝试：" & vbCrLf &
+                MsgBox($"PCL 没有对当前文件夹的权限（{Paths.Base}PCL\），请尝试：" & vbCrLf &
                   "1. 将 PCL 移动到其他文件夹" & If(PathUtils.GetDiskName(Paths.Base) = "C"c, "，例如 C 盘和桌面以外的其他位置。", "。") & vbCrLf &
                   "2. 删除当前目录中的 PCL 文件夹，然后再试。" & vbCrLf &
                   "3. 右键 PCL 选择属性，打开 兼容性 中的 以管理员身份运行此程序。",

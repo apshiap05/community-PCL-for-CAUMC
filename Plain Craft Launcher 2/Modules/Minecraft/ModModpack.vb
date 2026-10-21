@@ -28,7 +28,7 @@ Public Module ModModpack
     ''' 构建并启动安装给定的整合包文件的加载器，并返回该加载器。若失败则抛出异常。
     ''' 必须在工作线程执行。
     ''' </summary>
-    Public Function ModpackInstall(File As String, Optional InstanceName As String = Nothing, Optional Logo As String = Nothing) As LoaderCombo(Of String)
+    Public Function ModpackInstall(File As String, Optional InstanceName As String = Nothing, Optional Logo As String = Nothing, Optional Automatic As Boolean = False) As LoaderCombo(Of String)
         Logger.Info($"整合包安装请求：{If(File, "null")}")
         Dim Archive As ZipArchive = Nothing
         Dim ArchiveBaseFolder As String = ""
@@ -84,6 +84,18 @@ Public Module ModModpack
                     Throw New Exception("打开整合包文件失败，文件可能损坏或为不支持的压缩包格式", ex)
                 End If
             End Try
+            If Automatic AndAlso InstanceName Is Nothing AndAlso {0, 3, 4}.Contains(PackType) Then
+                Dim Metadata = If(Archive.GetEntry(ArchiveBaseFolder & "mcbbs.packmeta"),
+                    If(Archive.GetEntry(ArchiveBaseFolder & "manifest.json"), Archive.GetEntry(ArchiveBaseFolder & "modrinth.index.json")))
+                Dim Name As String = "CAUMC 整合包"
+                If Metadata IsNot Nothing Then
+                    Using Stream = Metadata.Open()
+                        Dim Json = Stream.ReadString(Encoding.UTF8).DeserializeJson(Of JObject)()
+                        If Json("name")?.Type = JTokenType.String Then Name = CStr(Json("name"))
+                    End Using
+                End If
+                InstanceName = PCLCS.CAUMC.PclDataImport.UniqueInstanceName(McFolderSelected & "versions", Name)
+            End If
             '执行对应的安装方法
             If RestrictMcDownload Then Throw New Exception("为遵守相关法律法规，PCL 暂时不再提供 MC 下载功能，非常抱歉 qwq……")
             Select Case PackType
@@ -104,10 +116,10 @@ Public Module ModModpack
                     Return InstallPackModrinth(File, Archive, ArchiveBaseFolder, InstanceName, Logo)
                 Case 9
                     Logger.Info("整合包种类：带启动器的压缩包")
-                    Return InstallPackLauncherPack(File, Archive, ArchiveBaseFolder, InstanceName, Logo)
+                    Return InstallPackLauncherPack(File, Archive, ArchiveBaseFolder, InstanceName, Logo, Automatic)
                 Case Else
                     Logger.Info("整合包种类：未能识别，假定为压缩包")
-                    Return InstallPackCompress(File, Archive)
+                    Return InstallPackCompress(File, Archive, Automatic)
             End Select
         Finally
             If Archive IsNot Nothing Then Archive.Dispose()
@@ -762,7 +774,7 @@ Public Module ModModpack
 
     '带启动器的压缩包
     Private Function InstallPackLauncherPack(FileAddress As String, Archive As ZipArchive, ArchiveBaseFolder As String,
-                                             Optional InstanceName As String = Nothing, Optional Logo As String = Nothing) As LoaderCombo(Of String)
+                                             Optional InstanceName As String = Nothing, Optional Logo As String = Nothing, Optional Automatic As Boolean = False) As LoaderCombo(Of String)
         ' CAUMC keeps the current launcher and its independent settings. The embedded pack
         ' still uses the original format-specific installer; bundled executables are not run.
         Dim InnerEntry = If(Archive.GetEntry(ArchiveBaseFolder & "modpack.mrpack"), Archive.GetEntry(ArchiveBaseFolder & "modpack.zip"))
@@ -772,13 +784,13 @@ Public Module ModModpack
                 Input.CopyTo(Output)
             End Using
             Logger.Info("使用当前 CAUMC 启动器安装压缩包中的整合包")
-            Return ModpackInstall(InnerPath, InstanceName, Logo)
+            Return ModpackInstall(InnerPath, InstanceName, Logo, Automatic)
         End If
         Throw New Exception("未找到压缩包内的整合包文件")
     End Function
 
     '普通压缩包
-    Private Function InstallPackCompress(FileAddress As String, Archive As ZipArchive) As LoaderCombo(Of String)
+    Private Function InstallPackCompress(FileAddress As String, Archive As ZipArchive, Optional Automatic As Boolean = False) As LoaderCombo(Of String)
         '尝试定位 .minecraft 文件夹：寻找形如 “/versions/XXX/XXX.json” 的路径
         Dim Match As Match = Nothing
         Dim Regex As New Regex("^.*\/(?=versions\/(?<ver>[^\/]+)\/(\k<ver>)\.json$)", RegexOptions.IgnoreCase)
@@ -793,8 +805,14 @@ Public Module ModModpack
         Dim ArchiveBaseFolder As String = Match.Value.Replace("/", "\").TrimStart("\") '格式例如：包裹文件夹\.minecraft\（最短为空字符串）
         Logger.Info($"检测到压缩包的 .minecraft 根目录：{ArchiveBaseFolder}，命中的版本名：{Match.Groups(1).Value}")
         '获取解压路径
-        MyMsgBox("接下来请选择一个空文件夹，它会被安装到这个文件夹里。", "安装", "继续", ForceWait:=True)
-        Dim TargetFolder As String = Dialogs.SelectFolder("选择安装目标（必须是一个空文件夹）", False).FirstOrDefault
+        Dim TargetFolder As String
+        If Automatic Then
+            TargetFolder = Paths.Base & "ImportedPacks\" & Guid.NewGuid().ToString("N") & "\"
+            Directory.CreateDirectory(TargetFolder)
+        Else
+            MyMsgBox("接下来请选择一个空文件夹，它会被安装到这个文件夹里。", "安装", "继续", ForceWait:=True)
+            TargetFolder = Dialogs.SelectFolder("选择安装目标（必须是一个空文件夹）", False).FirstOrDefault
+        End If
         If TargetFolder Is Nothing Then Throw New OperationCanceledException
         If TargetFolder.Contains("!") OrElse TargetFolder.Contains(";") Then Hint("Minecraft 文件夹路径中不能含有感叹号或分号！", HintType.Red) : Throw New OperationCanceledException
         If Not DirectoryUtils.IsEmpty(TargetFolder) Then Hint("请选择一个空文件夹作为安装目标！", HintType.Red) : Throw New OperationCanceledException
@@ -804,9 +822,16 @@ Public Module ModModpack
             Sub(Task As LoaderTask(Of String, Integer))
                 ExtractModpackFiles(TargetFolder, FileAddress, Task.CreateCancellationToken(), Task.CreateSyncProgressProvider(ToPercentage:=0.95))
                 '加入文件夹列表
-                PageSelectLeft.AddFolder(TargetFolder & ArchiveBaseFolder, PathUtils.GetLastPart(TargetFolder), False)
+                If Automatic Then
+                    CaumcRegisterGameFolder(TargetFolder & ArchiveBaseFolder, "CAUMC · " & Match.Groups("ver").Value)
+                    McFolderSelected = TargetFolder & ArchiveBaseFolder
+                    WriteIni(McFolderSelected & "PCL.ini", "Version", Match.Groups("ver").Value)
+                    McFolderListLoader.Start(IsForceRestart:=True)
+                Else
+                    PageSelectLeft.AddFolder(TargetFolder & ArchiveBaseFolder, PathUtils.GetLastPart(TargetFolder), False)
+                End If
                 Thread.Sleep(400) '避免文件争用
-                RunInUi(Sub() FrmMain.PageChange(FormMain.PageType.InstanceSelect))
+                If Not Automatic Then RunInUi(Sub() FrmMain.PageChange(FormMain.PageType.InstanceSelect))
             End Sub)
         }) With {.OnStateChanged = AddressOf McInstallState}
         Loader.Start(TargetFolder)

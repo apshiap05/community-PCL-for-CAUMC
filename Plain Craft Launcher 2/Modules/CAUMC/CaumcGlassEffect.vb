@@ -22,7 +22,7 @@ Public Class CaumcGlassEffect
 
     Friend Sub Configure(Viewport As Rect, Size As Size, Radius As Double, Bezel As Double, Thickness As Double, Density As Double, Enabled As Boolean)
         SetValue(ViewportProperty, New Point4D(Viewport.Width, Viewport.Height, Viewport.X, Viewport.Y))
-        SetValue(ShapeProperty, New Point4D(Size.Width, Size.Height, Math.Max(1, Radius), Math.Max(1, Bezel)))
+        SetValue(ShapeProperty, New Point4D(Size.Width, Size.Height, Math.Max(0, Radius), Math.Max(1, Bezel)))
         SetValue(OpticsProperty, New Point4D(Thickness, 0.012, 1.02, If(Enabled, 1, 0)))
         SetValue(TintProperty, New Point4D(1, 1, 1, Density))
     End Sub

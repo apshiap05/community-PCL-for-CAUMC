@@ -58,11 +58,10 @@ Public Module ModMinecraft
     Private Sub McFolderListLoadSub()
         Try
             '初始化
-            Dim CacheMcFolderList = New List(Of McFolder) From {New McFolder With {.Name = "CAUMC 游戏目录", .Location = CaumcGameDirectory, .Type = McFolder.Types.Vanilla}}
+            Dim CacheMcFolderList As New List(Of McFolder)
 
 #Region "读取默认（Original）文件夹，即当前、官启文件夹，可能没有结果"
 
-            If False Then 'CAUMC: existing directories are only added explicitly.
             '扫描当前文件夹
             Try
                 If DirectoryUtils.Exists(Paths.Base & "versions\") Then CacheMcFolderList.Add(New McFolder With {.Name = "当前文件夹", .Location = Paths.Base, .Type = McFolder.Types.Vanilla})
@@ -82,7 +81,6 @@ Public Module ModMinecraft
                 CacheMcFolderList.Add(New McFolder With {.Name = "官方启动器文件夹", .Location = MojangPath, .Type = McFolder.Types.Vanilla})
             End If
 
-            End If
 #End Region
 
 #Region "读取自定义（Custom）文件夹，可能没有结果"

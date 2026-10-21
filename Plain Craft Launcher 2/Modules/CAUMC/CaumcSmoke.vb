@@ -19,8 +19,17 @@ Public Module CaumcSmoke
                 Splash.CopyPixels(New Int32Rect(0, 0, 1, 1), Pixel, 4, 0)
                 Check(Pixel(3) = 0, "启动动画图标保持透明背景", Results)
             End Using
-            Check(Directory.Exists(CaumcGameDirectory), "独立游戏目录", Results)
-            Check(Settings.Get(Of String)("LaunchFolderSelect").Contains("CAUMC"), "默认目录选择", Results)
+            Check(Directory.Exists(CaumcGameDirectory) AndAlso CaumcGameDirectory = Paths.Base & ".minecraft\", "兼容 PCL 的标准游戏目录", Results)
+            Check(Settings.Get(Of String)("LaunchFolderSelect") = "$.minecraft\", "默认目录选择", Results)
+            Check(Settings.DecodeStoredValue("LoginLegacyName", Settings.EncodeLegacyStoredValue("compatibility-player")) = "compatibility-player", "可读取原版兼容 DES 格式", Results)
+            Check(Settings.EncodeStoredValue("LoginLegacyName", "compatibility-player").StartsWith("dpapi:v1:"), "账号缓存保持加密并独立保存", Results)
+            Settings.Set("WindowWidth", 1078)
+            Check(ReadIni(Paths.Base & "PCL\Setup.ini", "WindowWidth", "") = "1078", "普通设置写入原版 PCL/Setup.ini", Results)
+            Settings.Set("CaumcPclImportOffered", True)
+            Check(ReadIni(Paths.Base & "PCL\CAUMC.ini", "CaumcPclImportOffered", "") = "True", "社区专属状态单独保存", Results)
+            Check(Settings.Get(Of Boolean)("UiHiddenSetupUi"), "个性化页面入口永久移除", Results)
+            Check(CaumcRegistryLocation("LaunchFolders", False) = "HKEY_CURRENT_USER\Software\PCL", "普通配置沿用原版 PCL 注册表位置", Results)
+            Check(CaumcRegistryLocation("LoginMsJson", False) = "HKEY_CURRENT_USER\Software\PCLForCAUMC", "保留原版账号缓存，社区账号加密缓存独立读写", Results)
             Dim Cipher = CaumcProtect("non-secret-smoke-marker")
             Check(Cipher.StartsWith("dpapi:v1:") AndAlso Not Cipher.Contains("smoke-marker"), "DPAPI 加密", Results)
             Check(CaumcUnprotect(Cipher) = "non-secret-smoke-marker", "DPAPI 解密", Results)
@@ -93,6 +102,7 @@ Public Module CaumcSmoke
             RenderAdditionalGuides(Results)
             CaumcRegression.Run(Results)
             If File.Exists(Paths.Base & "layout-tests") Then CaumcRegression.RunGlassPreviews(Results)
+            RunPackDownloadTests(Results)
             Results.Add("PASS 单 EXE 内嵌依赖装载")
             RunModpackIntegration(Results)
             CaumcRegression.RunFabric(Results)
@@ -107,6 +117,36 @@ Public Module CaumcSmoke
             Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree("Software\PCLForCAUMCTest", False)
         End Try
     End Function
+
+    Private Sub RunPackDownloadTests(Results As List(Of String))
+        Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/pack.zip?download=1")
+        Dim Before = Settings.Get(Of String)("LaunchFolders")
+        Dim PreviousFolder = McFolderSelected
+        Dim Loader = DownloadGuidePack(Address)
+        Check(Loader IsNot Nothing AndAlso Object.ReferenceEquals(Loader, DownloadGuidePack(Address)), "连续点击 ZIP 链接复用同一下载导入任务", Results)
+        Dim Operation = System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(45)
+            While Loader.State = LoadState.Loading OrElse Loader.State = LoadState.Waiting
+                If DateTime.UtcNow > Deadline Then
+                    Loader.Cancel()
+                    Throw New TimeoutException("整合包下载导入测试超时")
+                End If
+                Thread.Sleep(30)
+            End While
+            If Loader.State <> LoadState.Finished Then Throw New IOException("内置整合包下载导入失败", Loader.Error)
+        End Sub)
+        Try
+            PumpUntilComplete(Operation)
+            Operation.GetAwaiter().GetResult()
+            Dim Imported = Directory.EnumerateFiles(Paths.Base & "ImportedPacks", "caumc-download-fixture.json", SearchOption.AllDirectories).Single()
+            Dim InstanceFolder = Path.GetDirectoryName(Imported)
+            Check(File.ReadAllText(InstanceFolder & "\mods\fixture.jar") = "downloaded-mod-marker", "真实 HTTP 经 PCL 下载器下载后自动导入 Mod", Results)
+            Check(File.ReadAllText(InstanceFolder & "\saves\fixture\level.dat") = "downloaded-world-marker", "自动导入完整保留整合包存档", Results)
+            Check(Settings.Get(Of String)("LaunchFolders") <> Before AndAlso Settings.Get(Of String)("LaunchFolders").Contains("ImportedPacks"), "自动导入的游戏进入 PCL 文件夹列表", Results)
+        Finally
+            McFolderSelected = PreviousFolder
+        End Try
+    End Sub
 
     Private Sub Check(Condition As Boolean, Name As String, Results As List(Of String))
         If Not Condition Then Throw New Exception(Name)

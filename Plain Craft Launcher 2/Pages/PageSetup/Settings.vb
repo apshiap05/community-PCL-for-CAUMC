@@ -83,6 +83,7 @@ Public Class Settings
         New Setting("CaumcLoginChoice", 3),
         New Setting("CaumcInitialized", False),
         New Setting("CaumcGuideDismissed", False),
+        New Setting("CaumcPclImportOffered", False),
         New Setting("LoginType", McLoginType.Auth, Source:=Sources.Registry),
         New Setting("LoginPageType", 0),
         New Setting("LaunchSkinID", "", Source:=Sources.Registry, OnChanged:=Sub() PageLaunchLeft.SkinLegacy.Start()),
@@ -256,10 +257,10 @@ Public Class Settings
                 Return
             End If
             Logger.Trace($"保存设置：{Key} {If(Encrypted, "", "= " & Value)}{If(Instance Is Nothing, "", $"（实例：{Instance?.PathVersion}）")}")
-            If Encrypted Then Value = CaumcProtect(If(Value, ""))
+            If Encrypted Then Value = EncodeStoredValue(Key, If(Value, ""))
             Select Case Source
                 Case Sources.Normal
-                    WriteIni("Setup", Key, Value)
+                    WriteIni(If(Key.StartsWith("Caumc"), "CAUMC", "Setup"), Key, Value)
                 Case Sources.Registry
                     Try
                         RegistryUtils.Write(CaumcRegistryPath(Key), Key, Value)
@@ -316,6 +317,7 @@ Public Class Settings
         '对部分设置强制赋值
         Static ForcedSettings As New Dictionary(Of String, Object) From {
             {"UiHiddenPageLink", True},
+            {"UiHiddenSetupUi", True},
             {"UiHiddenSetupLink", True}
         }
         Dim ForcedSetting As Object = Nothing
@@ -326,12 +328,18 @@ Public Class Settings
         '正常读取
         Try
             Dim GotValue As String = Nothing '先用 String 储存，避免类型转换
-            Dim DefaultValue As String = If(Entry.Encrypted, CaumcProtect(Entry.DefaultValue), Entry.DefaultValue)
+            Dim DefaultValue As String = Entry.DefaultValue
             Select Case Entry.Source
                 Case Sources.Normal
-                    GotValue = ReadIni("Setup", Key, DefaultValue)
+                    GotValue = ReadIni(If(Key.StartsWith("Caumc"), "CAUMC", "Setup"), Key, DefaultValue)
                 Case Sources.Registry
                     GotValue = RegistryUtils.TryRead(CaumcRegistryPath(Key), Key, DefaultValue)
+                    ' Preserve opaque upstream account caches. Where the legacy
+                    ' format can be decoded, it can seed this launcher's cache.
+                    If Entry.Encrypted AndAlso Not CaumcIsAuthSetting(Key) AndAlso Not RegistryUtils.Has(CaumcRegistryPath(Key), Key) AndAlso
+                        Not Environment.GetCommandLineArgs().Contains("--caumc-selftest") Then
+                        GotValue = RegistryUtils.TryRead("HKEY_CURRENT_USER\Software\PCL", Key, DefaultValue)
+                    End If
                 Case Sources.Instance
                     If Instance Is Nothing Then
                         Throw New Exception($"读取版本设置 {Key} 时未提供目标版本")
@@ -344,12 +352,10 @@ Public Class Settings
                     GotValue = Entry.DefaultValue
                 Else
                     Try
-                        GotValue = CaumcUnprotect(GotValue)
+                        GotValue = DecodeStoredValue(Key, GotValue)
                     Catch ex As Exception
                         Logger.Warn(ex, $"解密设置失败：{Key}")
                         GotValue = Entry.DefaultValue
-                        Entry.Set(Entry.DefaultValue, Instance)
-                        Entry.Save(Instance)
                     End Try
                 End If
             End If
@@ -388,7 +394,7 @@ Public Class Settings
             Entry.Set(Entry.DefaultValue, Instance)
             Select Case Entry.Source
                 Case Sources.Normal
-                    DeleteIniKey("Setup", Key)
+                    DeleteIniKey(If(Key.StartsWith("Caumc"), "CAUMC", "Setup"), Key)
                 Case Sources.Registry
                     Try
                         RegistryUtils.Delete(CaumcRegistryPath(Key), Key)
@@ -420,7 +426,7 @@ Public Class Settings
     Public Shared Function HasSaved(Key As String, Optional Instance As McInstance = Nothing) As Boolean
         Select Case Entries(Key).Source
             Case Sources.Normal
-                Return HasIniKey("Setup", Key)
+                Return HasIniKey(If(Key.StartsWith("Caumc"), "CAUMC", "Setup"), Key)
             Case Sources.Registry
                 Try
                     Return RegistryUtils.Has(CaumcRegistryPath(Key), Key)
@@ -435,6 +441,19 @@ Public Class Settings
     End Function
 
 #Region "DES 加密"
+
+    Friend Shared Function EncodeStoredValue(Key As String, Value As String) As String
+        Return CaumcProtect(Value)
+    End Function
+
+    Friend Shared Function EncodeLegacyStoredValue(Value As String) As String
+        Return DesEncrypt(Value, "PCL" & Identify)
+    End Function
+
+    Friend Shared Function DecodeStoredValue(Key As String, Value As String) As String
+        If Value.StartsWith("dpapi:v1:", StringComparison.Ordinal) Then Return CaumcUnprotect(Value)
+        Return DesDecrypt(Value, "PCL" & Identify)
+    End Function
 
     Private Shared ReadOnly desInitialVector As Byte() = Encoding.UTF8.GetBytes("95168702")
 

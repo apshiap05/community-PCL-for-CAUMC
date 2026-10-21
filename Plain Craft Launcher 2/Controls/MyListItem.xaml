@@ -20,9 +20,7 @@
         <RowDefinition Height="Auto" />
         <RowDefinition Height="1*" />
     </Grid.RowDefinitions>
-    <Border x:Name="GlassSelection" CornerRadius="{StaticResource GlassControlCorner}" Margin="5,2" Grid.ColumnSpan="999" Grid.RowSpan="999"
-            Background="{StaticResource GlassControlSelected}" BorderBrush="{StaticResource GlassControlAccentStroke}" BorderThickness="{StaticResource GlassBorderThickness}" IsHitTestVisible="False" Visibility="Collapsed"><local:CaumcGlassSurface Material="Control" Radius="{StaticResource GlassControlRadius}" /></Border>
-    <!--<Border x:Name="RectBack" CornerRadius="3" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True" IsHitTestVisible="False" Opacity="0" Grid.ColumnSpan="4" Background="{DynamicResource ColorBrush7}" BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1" />-->
+<!--<Border x:Name="RectBack" CornerRadius="3" RenderTransformOrigin="0.5,0.5" SnapsToDevicePixels="True" IsHitTestVisible="False" Opacity="0" Grid.ColumnSpan="4" Background="{DynamicResource ColorBrush7}" BorderBrush="{DynamicResource ColorBrush6}" BorderThickness="1" />-->
     <!--<StackPanel VerticalAlignment="Center">-->
     <TextBlock Grid.Row="1" SnapsToDevicePixels="False" UseLayoutRounding="False" HorizontalAlignment="Left" x:Name="LabTitle" IsHitTestVisible="False" Grid.Column="3" Text="{Binding Title, ElementName=PanBack}" TextTrimming="CharacterEllipsis" FontSize="{Binding FontSize, ElementName=PanBack}" Foreground="{Binding Foreground, ElementName=PanBack}" Margin="4,0,0,0" />
     <!--<TextBlock Grid.Row="2" SnapsToDevicePixels="False" UseLayoutRounding="False" HorizontalAlignment="Left" x:Name="LabInfo" IsHitTestVisible="False" Grid.Column="2" TextTrimming="CharacterEllipsis" Visibility="Collapsed" FontSize="12" Foreground="{StaticResource ColorBrushGray2}" Margin="4,0,0,0" />-->

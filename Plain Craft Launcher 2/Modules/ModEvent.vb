@@ -401,14 +401,14 @@ Public Class CustomEvent
             '绝对路径
             Location = RelativeUrl
             Logger.Info($"自定义事件中由绝对路径{Type}：{Location}")
-        ElseIf FileUtils.Exists(Paths.Base & "PCLForCAUMC\" & RelativeUrl) Then
+        ElseIf FileUtils.Exists(Paths.Base & "PCL\" & RelativeUrl) Then
             '相对 PCL 文件夹的路径
-            Location = Paths.Base & "PCLForCAUMC\" & RelativeUrl
+            Location = Paths.Base & "PCL\" & RelativeUrl
             Logger.Info($"自定义事件中由相对 PCL 文件夹的路径{Type}：{Location}")
-        ElseIf FileUtils.Exists(Paths.Base & "PCLForCAUMC\Help\" & RelativeUrl) Then
+        ElseIf FileUtils.Exists(Paths.Base & "PCL\Help\" & RelativeUrl) Then
             '相对 PCL 本地帮助文件夹的路径
-            Location = Paths.Base & "PCLForCAUMC\Help\" & RelativeUrl
-            WorkingDir = Paths.Base & "PCLForCAUMC\Help\"
+            Location = Paths.Base & "PCL\Help\" & RelativeUrl
+            WorkingDir = Paths.Base & "PCL\Help\"
             Logger.Info($"自定义事件中由相对 PCL 本地帮助文件夹的路径{Type}：{Location}")
         ElseIf Type = EventType.打开帮助 AndAlso FileUtils.Exists(PathTemp & "Help\" & RelativeUrl) Then
             '相对 PCL 自带帮助文件夹的路径

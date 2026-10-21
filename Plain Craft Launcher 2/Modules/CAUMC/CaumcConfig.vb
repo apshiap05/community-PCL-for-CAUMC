@@ -1,6 +1,6 @@
 Imports System.Security.Cryptography
 
-' CAUMC defaults are independent of individual modpacks and upstream PCL settings.
+' Game/configuration layout stays compatible with upstream PCL.
 Public Module CaumcConfig
     Public Const CaumcName As String = "PCL for CAUMC"
     Public Const CaumcSkinSite As String = "https://skin.caumc.cn/"
@@ -12,17 +12,18 @@ Public Module CaumcConfig
 
     Public ReadOnly Property CaumcGameDirectory As String
         Get
-            Return Paths.Base & "CAUMC\.minecraft\"
+            Return Paths.Base & ".minecraft\"
         End Get
     End Property
 
     Public Sub CaumcInitialize()
-        Directory.CreateDirectory(Paths.Base & "PCLForCAUMC")
+        Directory.CreateDirectory(Paths.Base & "PCL")
         Directory.CreateDirectory(CaumcGameDirectory & "versions")
-        If Not Settings.Get(Of Boolean)("CaumcInitialized") Then
-            Settings.Set("LaunchFolderSelect", "$CAUMC\.minecraft\")
-            Settings.Set("CaumcInitialized", True)
-        End If
+        Dim Selected = Settings.Get(Of String)("LaunchFolderSelect").Replace("$", Paths.Base)
+        If String.IsNullOrWhiteSpace(Selected) OrElse Not Directory.Exists(Selected) Then Settings.Set("LaunchFolderSelect", "$.minecraft\")
+        Dim PreviousGame = Paths.Base & "CAUMC\.minecraft\"
+        If Directory.Exists(PreviousGame & "versions") Then CaumcRegisterGameFolder(PreviousGame, "CAUMC 1.0 游戏")
+        Settings.Set("CaumcInitialized", True)
     End Sub
 
     Public Function CaumcAuthRoot() As String
@@ -88,7 +89,13 @@ Public Module CaumcConfig
     End Class
 
     Public Function CaumcRegistryPath(Key As String) As String
-        Return "HKEY_CURRENT_USER\Software\" & RegFolder & If(Environment.GetCommandLineArgs().Contains("--caumc-selftest"), "Test", "") & If(CaumcIsAuthSetting(Key), "\Auth\" & CaumcAuthScope, "")
+        Return CaumcRegistryLocation(Key, Environment.GetCommandLineArgs().Contains("--caumc-selftest"))
+    End Function
+
+    Friend Function CaumcRegistryLocation(Key As String, Test As Boolean) As String
+        Dim Encrypted = Settings.Entries IsNot Nothing AndAlso Settings.Entries.ContainsKey(Key) AndAlso Settings.Entries(Key).Encrypted
+        Return "HKEY_CURRENT_USER\Software\" & If(Test, "PCLForCAUMCTest", If(CaumcIsAuthSetting(Key) OrElse Encrypted, "PCLForCAUMC", "PCL")) &
+            If(CaumcIsAuthSetting(Key), "\Auth\" & CaumcAuthScope, "")
     End Function
 
     Public Sub CaumcUpdateRemember()

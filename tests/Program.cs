@@ -12,6 +12,7 @@ internal static class Program {
         response.Headers.ETag = new(etag); return response;
     }
     private static async Task Run(string fixture) {
+        RunImportChecks();
         var parsed = ArticleParser.Parse(Html, ArticleClient.Source);
         Assert(All(parsed).Any(n => n.Kind == "heading" && n.Level == 1), "保留标题层级");
         Assert(!All(parsed).Any(n => n.Text.Contains("sidebar-not-content")), "只提取正文");
@@ -122,6 +123,55 @@ internal static class Program {
             return 0;
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
+    }
+    private static void RunImportChecks() {
+        var scratch = Path.Combine(Path.GetTempPath(), "caumc-import-" + Guid.NewGuid().ToString("N"));
+        var launcher = Path.Combine(scratch, "旧 PCL");
+        var game = Path.Combine(launcher, ".minecraft");
+        var instance = Path.Combine(game, "versions", "Fabric 游戏");
+        Directory.CreateDirectory(Path.Combine(instance, "saves", "我的世界"));
+        Directory.CreateDirectory(Path.Combine(instance, "mods"));
+        Directory.CreateDirectory(Path.Combine(instance, "PCL"));
+        var samples = new Dictionary<string,string> {
+            ["versions/Fabric 游戏/Fabric 游戏.json"] = "{\"id\":\"Fabric 游戏\",\"inheritsFrom\":\"1.21.1\"}",
+            ["versions/Fabric 游戏/PCL/Setup.ini"] = "VersionArgumentIndieV2:True\n",
+            ["versions/Fabric 游戏/saves/我的世界/level.dat"] = "world-data",
+            ["versions/Fabric 游戏/mods/example.jar"] = new string('X', 2 * 1024 * 1024),
+            ["options.txt"] = "key_key.sneak:key.keyboard.left.shift",
+            ["libraries/example.jar"] = "library-data",
+            ["assets/indexes/example.json"] = "{}"
+        };
+        try {
+            foreach (var entry in samples) { var file = Path.Combine(game, entry.Key); Directory.CreateDirectory(Path.GetDirectoryName(file)!); File.WriteAllText(file, entry.Value); }
+            Directory.CreateDirectory(Path.Combine(launcher, "另一个游戏", "versions"));
+            Assert(PclDataImport.Discover(launcher).Count == 2 && PclDataImport.Discover(game).Contains(game), "识别旧 PCL 多游戏目录及直接选择 .minecraft");
+            var imports = Path.Combine(scratch, "新启动器", "ImportedGames");
+            var target = PclDataImport.CopyGame(game, imports, CancellationToken.None);
+            foreach (var entry in samples) Assert(File.ReadAllText(Path.Combine(target, entry.Key)) == entry.Value && File.ReadAllText(Path.Combine(game, entry.Key)) == entry.Value, "完整复制且保留原文件：" + entry.Key);
+            var second = PclDataImport.CopyGame(game, imports, CancellationToken.None);
+            Assert(second != target && Directory.Exists(target) && Directory.Exists(second), "重复和同名导入创建新目录，保留原实例 ID");
+            using var cancelled = new CancellationTokenSource();
+            try { PclDataImport.CopyGame(game, imports, cancelled.Token, new ImportProgress(_ => cancelled.Cancel())); throw new Exception("应被取消"); } catch (OperationCanceledException) { }
+            Assert(Directory.GetDirectories(imports).Length == 2, "导入中取消清理临时文件，不产生半成品目录");
+            try { PclDataImport.CopyGame(game, Path.Combine(game, "ImportedGames"), CancellationToken.None); throw new Exception("应拒绝嵌套导入"); } catch (IOException) { }
+            Assert(File.Exists(Path.Combine(game, "options.txt")), "拒绝递归复制，原游戏保留");
+            var oldIni = Path.Combine(scratch, "old.ini"); var newIni = Path.Combine(scratch, "new.ini");
+            File.WriteAllText(oldIni, "WindowWidth:800\nJavaPath:java.exe\n"); File.WriteAllText(newIni, "WindowWidth:1200\n");
+            PclDataImport.MergeIni(oldIni, newIni);
+            Assert(File.ReadAllText(newIni).Contains("WindowWidth:1200") && File.ReadAllText(newIni).Contains("JavaPath:java.exe"), "迁移设置只补缺失键，保留现有配置");
+            Assert(File.ReadAllText(newIni + ".before-caumc-migration.bak").Contains("WindowWidth:1200"), "迁移设置保留原配置备份");
+            foreach (var url in new[]{"https://doc.caumc.cn/a.zip", "https://files.example/包.ZIP?download=1#top", "https://files.example/a%2Ezip"})
+                Assert(PclDataImport.IsPackLink(5, new Uri(url)), "模组服 ZIP 链接匹配：" + url);
+            Assert(!PclDataImport.IsPackLink(2, new Uri("https://files.example/a.zip")) && !PclDataImport.IsPackLink(6, new Uri("https://files.example/a.zip")), "其他指南的 ZIP 链接保留普通打开方式");
+            Assert(!PclDataImport.IsPackLink(5, new Uri("https://files.example/a.zip.exe")) && !PclDataImport.IsPackLink(5, new Uri("file:///C:/a.zip")), "不匹配伪后缀及本地文件链接");
+            var versionRoot = Path.Combine(scratch, "version-names");
+            Directory.CreateDirectory(Path.Combine(versionRoot, "社区包"));
+            Assert(PclDataImport.UniqueInstanceName(versionRoot, "社区包") == "社区包 (2)", "自动安装同名整合包使用新版本名称，不覆盖已有游戏");
+            Assert(PclDataImport.UniqueInstanceName(versionRoot, "CON") == "CAUMC 整合包" && PclDataImport.UniqueInstanceName(versionRoot, "../unsafe;!").IndexOfAny(new[]{'/', ';', '!'}) < 0, "自动安装版本名处理路径字符和保留名称");
+        } finally { Directory.Delete(scratch, true); }
+    }
+    private sealed class ImportProgress(Action<PclImportProgress> action) : IProgress<PclImportProgress> {
+        public void Report(PclImportProgress value) => action(value);
     }
     private sealed class Handler : HttpMessageHandler {
         public Queue<Func<HttpRequestMessage, HttpResponseMessage>> Queue { get; } = new();

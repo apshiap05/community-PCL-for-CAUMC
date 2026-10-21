@@ -4,8 +4,8 @@ Friend Module ModSecret
 
     '标注 PCL 的不同分支，仅用于替换标记
     Public Const VersionBranchMain As String = "CAUMC"
-    '在开源版的注册表与常规版的注册表隔离，以防数据冲突
-    Public Const RegFolder As String = "PCLForCAUMC"
+    '常规配置与原版 PCL 共用；CAU 会话仍按认证站点独立保存。
+    Public Const RegFolder As String = "PCL"
     '用于微软登录的 ClientId
     Public OAuthClientId As String = CaumcResolveMicrosoftClientId()
     '用于匿名数据收集的腾讯云日志服务上报 URL，形如 https://{region}.cls.tencentcs.com/track?topic_id={topic_id}
@@ -161,7 +161,7 @@ Friend Module ModSecret
 #Region "更新"
 
     Friend Sub UpdateCheckByButton()
-        MyMsgBox("PCL for CAUMC 不提供自动更新。请从 CAUMC 发布渠道取得新版程序，关闭启动器后手动替换 EXE。请保留游戏目录及 PCLForCAUMC 设置目录。", "手动更新说明")
+        MyMsgBox("从 CAUMC 发布渠道取得新版程序，关闭启动器后替换 EXE 即可。保留游戏目录和 PCL 文件夹。", "手动更新说明")
     End Sub
 
     Friend IsUpdateWaitingRestart As Boolean = False
@@ -210,6 +210,10 @@ Friend Module ModSecret
     ''' 获取设备识别码。
     ''' </summary>
     Friend Function GetIdentify() As String
+        If Not Environment.GetCommandLineArgs().Contains("--caumc-selftest") Then
+            Dim Existing = CStr(RegistryUtils.TryRead("HKEY_CURRENT_USER\Software\PCL", "Identify", ""))
+            If System.Text.RegularExpressions.Regex.IsMatch(Existing, "^[A-Za-z0-9]{4}(?:-[A-Za-z0-9]{4}){3}$") Then Return Existing
+        End If
         Return "0000-0000-0000-0000"
     End Function
 

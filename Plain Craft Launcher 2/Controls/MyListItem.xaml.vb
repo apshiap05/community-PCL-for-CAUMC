@@ -19,7 +19,8 @@ Public Class MyListItem
                 Dim Rect As New Border With {
                     .Name = "RectBack",
                     .CornerRadius = New CornerRadius(10),
-                    .RenderTransform = If(IsScaleAnimationEnabled, New ScaleTransform(0.8, 0.8), Nothing),
+                    .RenderTransform = New ScaleTransform(1, 1),
+                    .Margin = New Thickness(5, 2, 5, 2),
                     .RenderTransformOrigin = New Point(0.5, 0.5),
                     .BorderThickness = New Thickness(GetWPFSize(0.8)),
                     .SnapsToDevicePixels = True,
@@ -94,7 +95,7 @@ Public Class MyListItem
         End Get
         Set
             _IsScaleAnimationEnabled = Value
-            If _RectBack IsNot Nothing Then RectBack.CornerRadius = New CornerRadius(If(Value, 6, 0))
+            If _RectBack IsNot Nothing Then RectBack.CornerRadius = New CornerRadius(10)
         End Set
     End Property
     Private _IsScaleAnimationEnabled As Boolean = True
@@ -432,8 +433,8 @@ Public Class MyListItem
                 End Select
             End If
 
-            ' The persistent selected pill is independent of the pointer hover layer.
-            GlassSelection.Visibility = If(Checked AndAlso Type = CheckType.RadioBox, Visibility.Visible, Visibility.Collapsed)
+            StateLast = Nothing
+            RefreshColor(Me, EventArgs.Empty)
 
             '更改动画
 
@@ -549,91 +550,41 @@ Public Class MyListItem
     Private StateLast As String
     Public IsMouseOverAnimationEnabled As Boolean = True
     Public Sub RefreshColor(sender As Object, e As EventArgs) Handles Me.MouseEnter, Me.MouseLeave, Me.PreviewMouseLeftButtonDown, Me.PreviewMouseLeftButtonUp
-        '菜单虚拟化检测
         If ContentHandler IsNot Nothing Then
             ContentHandler(Me, e)
             ContentHandler = Nothing
         End If
-        '判断当前颜色
-        Dim StateNew As String, Time As Integer
-        If IsMouseDown AndAlso Not (Type = CheckType.RadioBox AndAlso Checked) Then
-            StateNew = "MouseDown"
-            Time = 120
-        Else
-            If IsMouseOver AndAlso IsMouseOverAnimationEnabled Then
-                StateNew = "MouseOver"
-                Time = 120
-            Else
-                StateNew = "Idle"
-                Time = 180
-            End If
+        ApplyInteractionState(IsMouseOver AndAlso IsMouseOverAnimationEnabled, IsMouseDown,
+            IsLoaded AndAlso AniControlEnabled = 0 AndAlso SystemParameters.ClientAreaAnimation)
+    End Sub
+
+    Friend Sub ApplyInteractionState(Hovered As Boolean, Pressed As Boolean, Animate As Boolean)
+        Dim Selected = Checked AndAlso Type = CheckType.RadioBox
+        Dim NewState = Selected.ToString() & Hovered.ToString() & Pressed.ToString()
+        If StateLast = NewState Then Return
+        StateLast = NewState
+        If Not Selected AndAlso Not Hovered AndAlso _RectBack Is Nothing Then Return
+        Dim Face = RectBack
+        Dim Fill = If(Selected, "GlassControlSelected", If(Pressed, "GlassControlSelected", "GlassControlHover"))
+        Dim Stroke = If(Selected, "GlassControlAccentStroke", "GlassControlStroke")
+        Dim Opacity = If(Selected OrElse Hovered, 1.0, 0.0)
+        Dim Scale = If(Pressed AndAlso IsScaleAnimationEnabled, 0.985, 1.0)
+        If ButtonStack IsNot Nothing Then
+            ButtonStack.Opacity = If(Hovered, 1, 0)
+            ColumnPaddingRight.Width = New GridLength(If(Hovered, Math.Max(MinPaddingRight, 5 + Buttons.Count * 25), MinPaddingRight))
         End If
-        If StateLast = StateNew Then Return
-        StateLast = StateNew
-        '触发颜色动画
-        If IsLoaded AndAlso AniControlEnabled = 0 Then '防止默认属性变更触发动画
-            '有动画
-            Dim Ani As New List(Of AniData)
-            If IsMouseOver AndAlso IsMouseOverAnimationEnabled Then
-                If ButtonStack IsNot Nothing Then
-                    Ani.Add(AaOpacity(ButtonStack, 1 - ButtonStack.Opacity, Time * 0.7, Time * 0.3))
-                    Ani.Add(AaDouble(Sub(i) ColumnPaddingRight.Width = New GridLength(Math.Max(0, ColumnPaddingRight.Width.Value + i)),
-                                     Math.Max(MinPaddingRight, 5 + Buttons.Count * 25) - ColumnPaddingRight.Width.Value, Time * 0.3, Time * 0.7))
-                End If
-                Ani.AddRange({
-                             AaColor(RectBack, Border.BackgroundProperty, If(IsMouseDown, "GlassControlSelected", "GlassControlHover"), Time),
-                             AaOpacity(RectBack, 1 - RectBack.Opacity, Time,, New AniEaseOutFluent)
-                         })
-                If IsScaleAnimationEnabled Then
-                    Ani.Add(AaScaleTransform(RectBack, 1 - CType(RectBack.RenderTransform, ScaleTransform).ScaleX, Time * 1.6,, New AniEaseOutFluent))
-                    If IsMouseDown Then
-                        Ani.Add(AaScaleTransform(Me, 0.98 - CType(Me.RenderTransform, ScaleTransform).ScaleX, Time * 0.9,, New AniEaseOutFluent))
-                    Else
-                        Ani.Add(AaScaleTransform(Me, 1 - CType(Me.RenderTransform, ScaleTransform).ScaleX, Time * 1.2,, New AniEaseOutFluent))
-                    End If
-                End If
-            Else
-                If ButtonStack IsNot Nothing Then
-                    Ani.Add(AaOpacity(ButtonStack, -ButtonStack.Opacity, Time * 0.4))
-                    Ani.Add(AaDouble(Sub(i) ColumnPaddingRight.Width = New GridLength(Math.Max(0, ColumnPaddingRight.Width.Value + i)),
-                                     MinPaddingRight - ColumnPaddingRight.Width.Value, Time * 0.4))
-                End If
-                Ani.Add(AaOpacity(RectBack, -RectBack.Opacity, Time))
-                If IsScaleAnimationEnabled Then
-                    Ani.AddRange({
-                        AaColor(RectBack, Border.BackgroundProperty, If(IsMouseDown, "GlassControlSelected", "GlassControlHover"), Time),
-                        AaScaleTransform(Me, 1 - CType(RenderTransform, ScaleTransform).ScaleX, Time * 3,, New AniEaseOutFluent),
-                        AaScaleTransform(RectBack, 0.996 - CType(RectBack.RenderTransform, ScaleTransform).ScaleX, Time,, New AniEaseOutFluent),
-                        AaScaleTransform(RectBack, -0.246, 1,,, True)
-                    })
-                End If
-            End If
-            AniStart(Ani, "ListItem Color " & Uuid)
+        Face.RenderTransform = New ScaleTransform(1, 1)
+        If Animate Then
+            AniStart({AaColor(Face, Border.BackgroundProperty, Fill, 160),
+                AaColor(Face, Border.BorderBrushProperty, Stroke, 160),
+                AaOpacity(Face, Opacity - Face.Opacity, 160,, New AniEaseOutFluent),
+                AaScaleTransform(Me, Scale - CType(RenderTransform, ScaleTransform).ScaleX, 180,, New AniEaseOutFluent)}, "ListItem Color " & Uuid)
         Else
-            '无动画
-            If IsMouseOver AndAlso IsMouseOverAnimationEnabled Then
-                If ButtonStack IsNot Nothing Then
-                    ButtonStack.Opacity = 1
-                    ColumnPaddingRight.Width = New GridLength(Math.Max(MinPaddingRight, 5 + Buttons.Count * 25))
-                End If
-                '由于鼠标已经移入，所以直接实例化 RectBack
-                RectBack.SetResourceReference(Border.BackgroundProperty, "GlassControlHover")
-                RectBack.Opacity = 1
-                RectBack.RenderTransform = New ScaleTransform(1, 1)
-                Me.RenderTransform = New ScaleTransform(1, 1)
-            Else
-                If ButtonStack IsNot Nothing Then
-                    ButtonStack.Opacity = 0
-                    ColumnPaddingRight.Width = New GridLength(MinPaddingRight)
-                End If
-                Me.RenderTransform = New ScaleTransform(1, 1)
-                If _RectBack IsNot Nothing Then
-                    If IsScaleAnimationEnabled Then RectBack.RenderTransform = New ScaleTransform(0.75, 0.75)
-                    RectBack.SetResourceReference(Border.BackgroundProperty, "GlassControlHover")
-                    RectBack.Opacity = 0
-                End If
-            End If
             AniStop("ListItem Color " & Uuid)
+            Face.SetResourceReference(Border.BackgroundProperty, Fill)
+            Face.SetResourceReference(Border.BorderBrushProperty, Stroke)
+            Face.Opacity = Opacity
+            RenderTransform = New ScaleTransform(Scale, Scale)
         End If
     End Sub
 

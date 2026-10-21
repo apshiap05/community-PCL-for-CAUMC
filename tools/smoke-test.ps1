@@ -23,7 +23,7 @@ if ($ModUpdateFixturePath) {
     $modUpdateRequest = Join-Path $ModUpdateFixturePath 'request.json'
     $modUpdateData = Get-Content -LiteralPath $modUpdateRequest -Raw -Encoding UTF8 | ConvertFrom-Json
     if ([IO.Path]::GetFileName($modUpdateData.oldFile) -ne $modUpdateData.oldFile) { throw 'Mod 更新样例文件名无效' }
-    $updateInstance = Join-Path $testRoot 'CAUMC/.minecraft/versions/caumc-mod-update-regression'
+    $updateInstance = Join-Path $testRoot '.minecraft/versions/caumc-mod-update-regression'
     New-Item -ItemType Directory -Force (Join-Path $updateInstance 'mods') | Out-Null
     Copy-Item -LiteralPath (Join-Path $ModUpdateFixturePath $modUpdateData.oldFile) -Destination (Join-Path $updateInstance 'mods')
     Copy-Item -LiteralPath (Join-Path $ModUpdateFixturePath 'game-profile.json') -Destination (Join-Path $updateInstance 'caumc-mod-update-regression.json')
@@ -31,7 +31,7 @@ if ($ModUpdateFixturePath) {
 }
 if ($SeedGameCachePath) {
     if (-not $FabricRequestPath) { throw '-SeedGameCachePath 需要同时提供 -FabricRequestPath' }
-    $targetGame = Join-Path $testRoot 'CAUMC/.minecraft'
+    $targetGame = Join-Path $testRoot '.minecraft'
     New-Item -ItemType Directory -Force $targetGame | Out-Null
     foreach ($folderName in @('assets', 'libraries')) {
         $seedFolder = Join-Path $SeedGameCachePath $folderName
@@ -43,7 +43,7 @@ if ($RegressionInstancePath) {
     $regressionSource = Get-Item -LiteralPath $RegressionInstancePath
     $regressionJson = Join-Path $regressionSource.FullName ($regressionSource.Name + '.json')
     if (-not (Test-Path -LiteralPath $regressionJson)) { throw 'Mod 回归实例缺少对应 JSON' }
-    $regressionTarget = Join-Path $testRoot 'CAUMC/.minecraft/versions/caumc-mod-regression'
+    $regressionTarget = Join-Path $testRoot '.minecraft/versions/caumc-mod-regression'
     New-Item -ItemType Directory -Force $regressionTarget | Out-Null
     Copy-Item -LiteralPath $regressionJson -Destination (Join-Path $regressionTarget 'caumc-mod-regression.json')
     $sourceMods = Join-Path $regressionSource.FullName 'mods'

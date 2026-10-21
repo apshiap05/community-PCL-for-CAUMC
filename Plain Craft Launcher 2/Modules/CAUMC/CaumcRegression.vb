@@ -48,8 +48,6 @@ Friend Module CaumcRegression
             Main.PanMainLeft.Child = New PageSetupLeft()
             Main.PanMainRight.Child = New PageSetupLaunch()
             RenderGlassFrame(1000, 640, 160, "settings-launch", Results)
-            Main.PanMainRight.Child = New PageSetupUI()
-            RenderGlassFrame(1000, 640, 160, "settings-appearance", Results)
             Main.PanMainRight.Child = New PageSetupSystem()
             RenderGlassFrame(1000, 640, 160, "settings-system", Results)
             Main.PanMainRight.Child = New PageInstanceSetup()
@@ -74,6 +72,8 @@ Friend Module CaumcRegression
             Main.PanMainRight.Child = New PageDownloadInstall()
             RenderGlassFrame(1000, 640, 160, "download-install", Results)
             RunControlGallery(Results)
+            RunNavigationChecks(Results)
+            RunPointerLightChecks(Results)
             Main.PanMainLeft.Child = New PageOtherLeft()
             Main.PanMainRight.Child = New PageOtherAbout()
             RenderGlassFrame(1000, 640, 160, "about", Results)
@@ -187,6 +187,7 @@ Friend Module CaumcRegression
                     {"gaussianBlurChangedPixels", BlurChanges}, {"directionalLightChangedPixels", LightChanges},
                     {"panelOnBlack", PanelPixel.ToString()}, {"buttonOnBlack", ButtonPixel.ToString()},
                     {"blueBackgroundSample", Blue.ToString()}, {"redBackgroundSample", Red.ToString()}}.ToString())
+                RunWindowEdgeChecks(Results)
                 SampleCard.Height = 20000
                 RenderGlassFrame(1000, 640, 160, "long-article", Results)
                 AssertRegression(VisualDescendants(SampleCard).OfType(Of CaumcGlassSurface)().All(Function(Item) Item.BackdropExtent.Height <= 724 AndAlso Item.BackdropExtent.Width <= 1084),
@@ -410,6 +411,44 @@ Friend Module CaumcRegression
             "可编辑下拉框不重复叠加内层玻璃", Results)
     End Sub
 
+    Private Sub RunNavigationChecks(Results As List(Of String))
+        For Each Left As FrameworkElement In {New PageDownloadLeft(), New PageSetupLeft(), New PageOtherLeft()}
+            FrmMain.PanMainLeft.Child = Left
+            RenderGlassFrame(1000, 640, 160, "navigation-" & Left.GetType().Name, Results)
+            Dim Item = VisualDescendants(Left).OfType(Of MyListItem)().First(Function(Control) Control.Type = MyListItem.CheckType.RadioBox AndAlso Control.Visibility = Visibility.Visible)
+            For Each Selected In {False, True}
+                Item.SetChecked(Selected, False, False)
+                For Each Hover In {False, True, False, True}
+                    Item.ApplyInteractionState(Hover, False, False)
+                    FrmMain.PanForm.UpdateLayout()
+                    AssertRegression(VisualDescendants(Item.RectBack).OfType(Of CaumcGlassSurface)().Count() = 1,
+                        "侧栏选中与悬停仅使用一层玻璃：" & Left.GetType().Name, Results)
+                    Dim Bounds = LayoutBounds(Item.RectBack, Item)
+                    AssertRegression(Bounds.Left >= 0 AndAlso Bounds.Right <= Item.ActualWidth AndAlso Bounds.Top >= 0 AndAlso Bounds.Bottom <= Item.ActualHeight,
+                        "侧栏悬停边框不扩张、不越界：" & Left.GetType().Name, Results)
+                Next
+            Next
+            SaveLayoutPreview(FrmMain.PanForm, 1000, 640, "navigation-hover-selected-" & Left.GetType().Name)
+        Next
+        Dim Setup As New PageSetupLeft()
+        AssertRegression(Not VisualDescendants(Setup).OfType(Of MyListItem)().Any(Function(Item) Item.Title = "个性化"), "设置侧栏不再包含个性化选项", Results)
+        AssertRegression(TypeOf Setup.PageGet(FormMain.PageSubType.SetupUI) Is PageSetupLaunch, "旧个性化导航目标回落到启动设置", Results)
+        Dim PreviousSelect = FrmSelectLeft
+        Dim PreviousFolders = McFolderList
+        Try
+            FrmSelectLeft = New PageSelectLeft()
+            McFolderList = New List(Of McFolder) From {New McFolder With {.Location = CaumcGameDirectory, .Name = "当前文件夹", .Type = McFolder.Types.Vanilla}}
+            GetType(PageSelectLeft).GetMethod("McFolderListUI", BindingFlags.Instance Or BindingFlags.NonPublic).Invoke(FrmSelectLeft, Nothing)
+            FrmMain.PanMainLeft.Child = FrmSelectLeft
+            RenderGlassFrame(1000, 640, 250, "versions-import-entry", Results)
+            Dim Choices = FrmSelectLeft.PanList.Children.OfType(Of MyListItem)().ToList()
+            AssertRegression(CStr(Choices.Last().Tag) = "CaumcImportPcl" AndAlso Choices.Last().Title = "导入旧 PCL", "旧 PCL 导入入口位于版本选择左栏最后一项", Results)
+        Finally
+            FrmSelectLeft = PreviousSelect
+            McFolderList = PreviousFolders
+        End Try
+    End Sub
+
     Private Sub RunWindowCornerChecks(Results As List(Of String))
         Dim Main = FrmMain
         Dim OldMargin = Main.PanBack.Margin
@@ -453,6 +492,57 @@ Friend Module CaumcRegression
         End Try
     End Sub
 
+    Private Sub RunWindowEdgeChecks(Results As List(Of String))
+        Dim Scene = FrmMain.GlassScene
+        Dim Previous = Scene.Background
+        Dim PhotoOpacity = FrmMain.GlassAtmosphere.Opacity
+        Try
+            Scene.Background = Brushes.Black
+            FrmMain.GlassAtmosphere.Opacity = 0
+            Dim Frame = RenderGlassImage()
+            Dim Top = GlassPixel(Frame, 500, 0)
+            Dim Inside = GlassPixel(Frame, 500, 4)
+            AssertRegression(Math.Abs(CInt(Top.R) - CInt(Inside.R)) <= 2, "窗口上缘没有额外白色描边或硬高光线", Results)
+            AssertRegression(GlassPixel(Frame, 0, 500).R < 3 AndAlso GlassPixel(Frame, 999, 500).R < 3 AndAlso GlassPixel(Frame, 500, 639).R < 3,
+                "窗口左、右、下外缘没有白色轮廓线", Results)
+        Finally
+            Scene.Background = Previous
+            FrmMain.GlassAtmosphere.Opacity = PhotoOpacity
+        End Try
+    End Sub
+
+    Private Sub RunPointerLightChecks(Results As List(Of String))
+        Dim Surface As New CaumcGlassSurface With {.Background = Brushes.Black}
+        Dim Host As New Window With {.Content = Surface, .Width = 300, .Height = 100, .Left = -10000, .Top = -10000,
+            .ShowInTaskbar = False, .ShowActivated = False, .WindowStyle = WindowStyle.None, .ResizeMode = ResizeMode.NoResize}
+        Try
+            Host.Show()
+            Host.UpdateLayout()
+            Surface.MoveLight(New Point(40, 40))
+            CaumcSmoke.PumpUntilComplete(System.Threading.Tasks.Task.Delay(200))
+            Dim First = CapturePointerSurface(Surface)
+            Surface.MoveLight(New Point(240, 40))
+            Dim Second = CapturePointerSurface(Surface)
+            If SystemParameters.ClientAreaAnimation Then
+                AssertRegression(GlassPixel(First, 40, 40).R > GlassPixel(Second, 40, 40).R + 20 AndAlso
+                    GlassPixel(Second, 240, 40).R > GlassPixel(First, 240, 40).R + 20, "真实渲染：柔和光斑跟随指针移动，不叠加旧位置", Results)
+            End If
+            Surface.HideLight()
+            CaumcSmoke.PumpUntilComplete(System.Threading.Tasks.Task.Delay(280))
+            Dim Last = CapturePointerSurface(Surface)
+            AssertRegression(GlassPixel(Last, 240, 40).R < 3, "真实渲染：指针离开后高光自然淡出", Results)
+        Finally
+            Host.Close()
+        End Try
+    End Sub
+
+    Private Function CapturePointerSurface(Surface As FrameworkElement) As Media.Imaging.RenderTargetBitmap
+        Surface.UpdateLayout()
+        Dim Frame As New Media.Imaging.RenderTargetBitmap(300, 100, 96, 96, PixelFormats.Pbgra32)
+        Frame.Render(Surface)
+        Return Frame
+    End Function
+
     Private Sub RenderGlassFrame(Width As Double, Height As Double, LeftWidth As Double, Name As String, Results As List(Of String))
         Dim Main = FrmMain
         Main.PanForm.Width = Width
@@ -468,7 +558,7 @@ Friend Module CaumcRegression
             Dim Title = Card.MainTextBlock ' Initialize title without invoking a page Loaded handler.
         Next
         For Each Item In VisualDescendants(Main.PanForm).OfType(Of MyListItem)()
-            Item.GlassSelection.Visibility = If(Item.Checked AndAlso Item.Type = MyListItem.CheckType.RadioBox, Visibility.Visible, Visibility.Collapsed)
+            Item.ApplyInteractionState(False, False, False)
         Next
         For Each Item In VisualDescendants(Main.PanForm).OfType(Of MyRadioButton)()
             Item.GlassFace.Visibility = If(Item.Checked, Visibility.Visible, Visibility.Collapsed)

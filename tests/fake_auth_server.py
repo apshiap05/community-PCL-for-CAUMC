@@ -2,6 +2,8 @@
 import json
 import sys
 import time
+import io
+import zipfile
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 
@@ -12,6 +14,24 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.split('?', 1)[0] == "/pack.zip":
+            archive = io.BytesIO()
+            with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as pack:
+                pack.writestr('.minecraft/versions/caumc-download-fixture/caumc-download-fixture.json', json.dumps({
+                    'id': 'caumc-download-fixture', 'mainClass': 'net.minecraft.client.main.Main',
+                    'type': 'release', 'releaseTime': '2024-08-08T00:00:00Z', 'libraries': [],
+                    'arguments': {'game': [], 'jvm': []}, 'assetIndex': {'id': 'fixture'}
+                }))
+                pack.writestr('.minecraft/versions/caumc-download-fixture/PCL/Setup.ini', 'VersionArgumentIndieV2:True\n')
+                pack.writestr('.minecraft/versions/caumc-download-fixture/mods/fixture.jar', 'downloaded-mod-marker')
+                pack.writestr('.minecraft/versions/caumc-download-fixture/saves/fixture/level.dat', 'downloaded-world-marker')
+            payload = archive.getvalue()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/zip')
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         payload = json.dumps({**PROFILE, "properties": []}).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

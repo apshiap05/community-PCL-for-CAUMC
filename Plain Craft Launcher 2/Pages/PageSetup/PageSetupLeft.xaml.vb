@@ -6,7 +6,6 @@ Public Class PageSetupLeft
         '是否处于隐藏的子页面
         Dim IsHiddenPage As Boolean = False
         If ItemLaunch.Checked AndAlso Settings.Get(Of Boolean)("UiHiddenSetupLaunch") Then IsHiddenPage = True
-        If ItemUI.Checked AndAlso Settings.Get(Of Boolean)("UiHiddenSetupUi") Then IsHiddenPage = True
         If ItemSystem.Checked AndAlso Settings.Get(Of Boolean)("UiHiddenSetupSystem") Then IsHiddenPage = True
         If ItemLink.Checked AndAlso Settings.Get(Of Boolean)("UiHiddenSetupLink") Then IsHiddenPage = True
         If PageSetupUI.HiddenForceShow Then IsHiddenPage = False
@@ -19,8 +18,6 @@ Public Class PageSetupLeft
         If IsPageSwitched Then Return
         If Not Settings.Get(Of Boolean)("UiHiddenSetupLaunch") Then
             ItemLaunch.SetChecked(True, False, False)
-        ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupUi") Then
-            ItemUI.SetChecked(True, False, False)
         ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupSystem") Then
             ItemSystem.SetChecked(True, False, False)
         ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupLink") Then
@@ -44,8 +41,6 @@ Public Class PageSetupLeft
         '选择第一个未被禁用的子页面
         If Not Settings.Get(Of Boolean)("UiHiddenSetupLaunch") Then
             PageID = FormMain.PageSubType.SetupLaunch
-        ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupUi") Then
-            PageID = FormMain.PageSubType.SetupUI
         ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupSystem") Then
             PageID = FormMain.PageSubType.SetupSystem
         ElseIf Not Settings.Get(Of Boolean)("UiHiddenSetupLink") Then
@@ -58,7 +53,7 @@ Public Class PageSetupLeft
     ''' <summary>
     ''' 勾选事件改变页面。
     ''' </summary>
-    Private Sub PageCheck(sender As MyListItem, e As EventArgs) Handles ItemLaunch.Check, ItemSystem.Check, ItemUI.Check, ItemLink.Check
+    Private Sub PageCheck(sender As MyListItem, e As EventArgs) Handles ItemLaunch.Check, ItemSystem.Check, ItemLink.Check
         '尚未初始化控件属性时，sender.Tag 为 Nothing，会跳过切换，且由于 PageID 默认为 0 而切换到第一个页面
         '若使用 IsLoaded，则会导致模拟点击不被执行（模拟点击切换页面时，控件的 IsLoaded 为 False）
         If sender.Tag IsNot Nothing Then PageChange(Val(sender.Tag))
@@ -74,8 +69,7 @@ Public Class PageSetupLeft
                 If FrmSetupLaunch Is Nothing Then FrmSetupLaunch = New PageSetupLaunch
                 Return FrmSetupLaunch
             Case FormMain.PageSubType.SetupUI
-                If FrmSetupUI Is Nothing Then FrmSetupUI = New PageSetupUI
-                Return FrmSetupUI
+                Return PageGet(FormMain.PageSubType.SetupLaunch)
             Case FormMain.PageSubType.SetupLink
                 If FrmSetupLink Is Nothing Then FrmSetupLink = New PageSetupLink
                 Return FrmSetupLink
@@ -91,6 +85,7 @@ Public Class PageSetupLeft
     ''' 切换现有页面。
     ''' </summary>
     Public Sub PageChange(ID As FormMain.PageSubType)
+        If ID = FormMain.PageSubType.SetupUI Then ID = FormMain.PageSubType.SetupLaunch
         If PageID = ID Then Return
         AniControlEnabled += 1
         IsPageSwitched = True
@@ -101,8 +96,7 @@ Public Class PageSetupLeft
                     If IsNothing(FrmSetupLaunch) Then FrmSetupLaunch = New PageSetupLaunch
                     PageChangeRun(FrmSetupLaunch)
                 Case FormMain.PageSubType.SetupUI
-                    If IsNothing(FrmSetupUI) Then FrmSetupUI = New PageSetupUI
-                    PageChangeRun(FrmSetupUI)
+                    PageChangeRun(PageGet(FormMain.PageSubType.SetupLaunch))
                 Case FormMain.PageSubType.SetupLink
                     If IsNothing(FrmSetupLink) Then FrmSetupLink = New PageSetupLink
                     PageChangeRun(FrmSetupLink)
@@ -150,12 +144,6 @@ Public Class PageSetupLeft
                     If IsNothing(FrmSetupLaunch) Then FrmSetupLaunch = New PageSetupLaunch
                     FrmSetupLaunch.Reset()
                     ItemLaunch.Checked = True
-                End If
-            Case FormMain.PageSubType.SetupUI
-                If MyMsgBox("是否要初始化 个性化 页面的所有设置？该操作不可撤销。" & vbCrLf & "（背景图片与音乐、主页等外部文件不会被删除）", "初始化确认",, "取消", IsWarn:=True) = 1 Then
-                    If IsNothing(FrmSetupUI) Then FrmSetupUI = New PageSetupUI
-                    FrmSetupUI.Reset()
-                    ItemUI.Checked = True
                 End If
             Case FormMain.PageSubType.SetupSystem
                 If MyMsgBox("是否要初始化 其他 页面的所有设置？该操作不可撤销。", "初始化确认",, "取消", IsWarn:=True) = 1 Then

@@ -214,6 +214,8 @@
     <Compile Include="Modules\Base\PclLogger.vb" />
     <Compile Include="Modules\CAUMC\CaumcConfig.vb" />
     <Compile Include="Modules\CAUMC\CaumcGlass.vb" />
+    <Compile Include="Modules\CAUMC\CaumcMigration.vb" />
+    <Compile Include="Modules\CAUMC\CaumcPackDownload.vb" />
     <Compile Include="Modules\CAUMC\CaumcGlassEffect.vb" />
     <Compile Include="Modules\CAUMC\CaumcPhotoBackdrop.vb" />
     <Compile Include="Modules\CAUMC\CaumcHomepage.vb" />

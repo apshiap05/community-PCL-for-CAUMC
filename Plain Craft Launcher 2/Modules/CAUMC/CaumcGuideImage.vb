@@ -39,7 +39,7 @@ Friend NotInheritable Class CaumcGuideImage
             Cancel.CancelAfter(TimeSpan.FromSeconds(30))
             Dim Cache As String
             Using Hash = System.Security.Cryptography.SHA256.Create()
-                Cache = Paths.Base & "PCLForCAUMC\Cache\Images\" & BitConverter.ToString(Hash.ComputeHash(Encoding.UTF8.GetBytes(Address.AbsoluteUri))).Replace("-", "") & ".img"
+                Cache = Paths.Base & "PCL\Cache\Images\" & BitConverter.ToString(Hash.ComputeHash(Encoding.UTF8.GetBytes(Address.AbsoluteUri))).Replace("-", "") & ".img"
             End Using
             Try
                 If File.Exists(Cache) AndAlso New FileInfo(Cache).Length <= Limit Then

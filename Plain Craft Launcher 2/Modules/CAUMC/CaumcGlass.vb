@@ -1,4 +1,5 @@
 Imports System.Windows.Media.Effects
+Imports System.Windows.Media.Animation
 
 ' A real two-stage backdrop: Gaussian blur, then a Snell refraction pixel shader.
 ' Content remains a sibling of this layer and is never supplied to the shader.
@@ -10,6 +11,9 @@ Public Class CaumcGlassSurface
     Private ReadOnly LensEffect As New CaumcGlassEffect()
     Private ReadOnly Sample As New VisualBrush With {.ViewboxUnits = BrushMappingMode.Absolute, .Stretch = Stretch.Fill}
     Private ReadOnly Shape As New RectangleGeometry()
+    Private ReadOnly HoverBrush As New RadialGradientBrush With {.MappingMode = BrushMappingMode.Absolute, .RadiusX = 120, .RadiusY = 90,
+        .GradientStops = New GradientStopCollection From {New GradientStop(Color.FromArgb(75, 255, 255, 255), 0), New GradientStop(Colors.Transparent, 1)}}
+    Private ReadOnly HoverGlow As Border
     Private LastBounds As Rect = Rect.Empty
     Private LastViewport As Rect = Rect.Empty
     Private LastSurfaceSize As Size = Size.Empty
@@ -80,6 +84,8 @@ Public Class CaumcGlassSurface
         Lens = New Border With {.Child = FrostHost, .Effect = LensEffect,
             .HorizontalAlignment = HorizontalAlignment.Left, .VerticalAlignment = VerticalAlignment.Top}
         Children.Add(Lens)
+        HoverGlow = New Border With {.Background = HoverBrush, .IsHitTestVisible = False, .Opacity = 0}
+        Children.Add(HoverGlow)
         HideLight()
         ConfigureMaterial()
         AddHandler LayoutUpdated, AddressOf RefreshSample
@@ -140,10 +146,18 @@ Public Class CaumcGlassSurface
 
     Friend Sub MoveLight(Position As Point)
         LensEffect.SetLight(New Vector(Position.X - ActualWidth * 0.5, Position.Y - ActualHeight * 0.5))
+        HoverBrush.Center = Position
+        HoverBrush.GradientOrigin = Position
+        If HoverGlow IsNot Nothing Then
+            If Not SystemParameters.ClientAreaAnimation Then Return
+            If HoverGlow.Opacity = 0 Then HoverGlow.BeginAnimation(UIElement.OpacityProperty,
+                New DoubleAnimation(0.55, TimeSpan.FromMilliseconds(140)) With {.EasingFunction = New QuadraticEase With {.EasingMode = EasingMode.EaseOut}})
+        End If
     End Sub
 
     Friend Sub HideLight()
         LensEffect.SetLight(New Vector(-1, -1))
+        If HoverGlow IsNot Nothing Then HoverGlow.BeginAnimation(UIElement.OpacityProperty, New DoubleAnimation(0, TimeSpan.FromMilliseconds(220)))
     End Sub
 
     Private Sub RefreshSample(sender As Object, e As EventArgs)

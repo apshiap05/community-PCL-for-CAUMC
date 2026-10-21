@@ -111,6 +111,11 @@ Public Class PageSelectLeft
             FrmSelectLeft.PanList.Children.Add(ItemInstall)
             AddHandler ItemInstall.Click, AddressOf ModpackInstall
 
+            Dim ImportOld As New MyListItem With {.Title = "导入旧 PCL", .Type = MyListItem.CheckType.Clickable,
+                .Height = 38, .IsScaleAnimationEnabled = False, .Tag = "CaumcImportPcl",
+                .Logo = "M4,7 L4,22 L24,22 L24,7 Z M14,1 L14,16 M8,10 L14,16 L20,10"}
+            AddHandler ImportOld.Click, Sub() RunInThread(Sub() CaumcOfferPclImport(True))
+            FrmSelectLeft.PanList.Children.Add(ImportOld)
             '边距
             FrmSelectLeft.PanList.Children.Add(New FrameworkElement With {.Height = 10, .IsHitTestVisible = False})
 

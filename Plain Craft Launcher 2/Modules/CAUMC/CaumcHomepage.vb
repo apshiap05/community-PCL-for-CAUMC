@@ -47,7 +47,7 @@ Public NotInheritable Class CaumcHomepage
             Sub(Address)
                 If Not TryNavigateGuide(Target, Address, Http) Then OpenWebsite(Address.AbsoluteUri)
             End Sub
-        Dim Service As New ArticleClient(Http, Paths.Base & "PCLForCAUMC\Cache\" & Guide.CacheFileName, Guide.Source)
+        Dim Service As New ArticleClient(Http, Paths.Base & "PCL\Cache\" & Guide.CacheFileName, Guide.Source)
         Dim Cached = Service.ReadCache()
         Dim Status = BuildPage(Target, Cached, Guide.PostId, Navigate)
         Status.Text = If(Cached Is Nothing, "正在加载" & Guide.Title & "……", "正在检查更新；缓存检查时间：" & Cached.CheckedAt.ToLocalTime().ToString("yyyy-MM-dd HH:mm"))
@@ -68,10 +68,18 @@ Public NotInheritable Class CaumcHomepage
 
     Friend Shared Function BuildPage(Target As StackPanel, Snapshot As ArticleSnapshot, Optional PostId As Integer = 2, Optional Navigate As Action(Of Uri) = Nothing) As TextBlock
         Dim Guide = GuideCatalog.ForPost(PostId)
-        Dim Navigation As Action(Of Uri) = If(Navigate,
+        Dim DefaultNavigation As Action(Of Uri) = If(Navigate,
             Sub(Address)
                 If Not TryNavigateGuide(Target, Address) Then OpenWebsite(Address.AbsoluteUri)
             End Sub)
+        Dim Navigation As Action(Of Uri) =
+            Sub(Address)
+                If PclDataImport.IsPackLink(Guide.PostId, Address) Then
+                    DownloadGuidePack(Address)
+                Else
+                    DefaultNavigation(Address)
+                End If
+            End Sub
         Target.Children.Clear()
         Dim Tabs As New Grid With {.Name = "CaumcGuideTabs", .Margin = New Thickness(0, 0, 0, 12)}
         For Index = 0 To GuideCatalog.All.Count - 1

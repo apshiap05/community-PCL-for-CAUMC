@@ -108,7 +108,7 @@
                         </LinearGradientBrush>
                     </Grid.Background>
                     <local:CaumcGlassSurface Radius="0" Material="Navigation" />
-                    <Border BorderThickness="0,1,0,1" BorderBrush="#40FFFFFF" IsHitTestVisible="False" />
+                    <Border BorderThickness="0,0,0,0.5" BorderBrush="#10FFFFFF" IsHitTestVisible="False" />
                     <local:MyImage x:Name="ImgTitle" IsHitTestVisible="False" Stretch="UniformToFill" IsEnabled="False" RenderOptions.BitmapScalingMode="LowQuality" />
                     <local:MyIconButton x:Name="BtnTitleClose" HorizontalAlignment="Right" Height="28" VerticalAlignment="Center" Width="28" Margin="0,0,12,0" Theme="Color"
                                        LogoScale="0.72" Logo="F1 M2,0 L0,2 8,10 0,18 2,20 10,12 18,20 20,18 12,10 20,2 18,0 10,8 2,0Z" />
@@ -185,7 +185,6 @@
                     <local:MyExtraButton x:Name="BtnExtraMusic" HorizontalAlignment="Right" VerticalAlignment="Center" Visibility="Collapsed" CanRightClick="True" />
                 </StackPanel>
                 <Grid x:Name="PanMsg" Grid.RowSpan="2" Background="#00000000" Visibility="Collapsed" />
-                <Border Grid.RowSpan="2" CornerRadius="12" BorderThickness="0.6" BorderBrush="#70FFFFFF" IsHitTestVisible="False" />
             </Grid>
         </Border>
     </Grid>

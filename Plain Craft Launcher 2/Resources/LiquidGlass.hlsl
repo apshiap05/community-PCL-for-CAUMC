@@ -30,7 +30,7 @@ float4 main(float2 uv : TEXCOORD) : COLOR
     // A single achromatic sample keeps edges quiet, without rainbow fringes.
     float3 rgb = tex2D(Backdrop, uv + delta).rgb;
     rgb = lerp(rgb, Tint.rgb, Tint.a);
-    float rim = exp2(-inward * 0.65);
+    float rim = exp2(-inward * 0.65) * step(0.5, Shape.z);
     float shine = saturate(dot(normal, Light.xy));
     shine *= shine;
     shine *= shine;
