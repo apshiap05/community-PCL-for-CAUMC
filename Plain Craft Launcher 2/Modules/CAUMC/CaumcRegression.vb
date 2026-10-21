@@ -4,6 +4,7 @@ Imports System.Reflection
 ' into the self-test's own game directory before any file operation is performed.
 Friend Module CaumcRegression
     Friend Sub RunGlassPreviews(Results As List(Of String))
+        RunPageEntryInteractionChecks(Results)
         ' Render the real window frame and real page controls without its Loaded
         ' lifecycle, so no player account or page download/search is started.
         Dim Main = FrmMain
@@ -208,6 +209,52 @@ Friend Module CaumcRegression
             Main.PanMsg.Visibility = Visibility.Collapsed
             Settings.Set("CaumcGuideDismissed", OldDismissed)
         End Try
+    End Sub
+
+    Private Sub RunPageEntryInteractionChecks(Results As List(Of String))
+        Dim PreviousGroups = AniGroups
+        AniGroups = New Dictionary(Of String, AniGroupEntry)()
+        Try
+            Dim SelectPage As New PageSelectLeft()
+            SelectPage.PanList.Children.Add(New MyListItem With {.Title = "当前文件夹", .Type = MyListItem.CheckType.RadioBox, .Checked = True, .IsScaleAnimationEnabled = False})
+            SelectPage.PanList.Children.Add(New MyListItem With {.Title = "导入旧 PCL", .Type = MyListItem.CheckType.Clickable})
+            For Each Page As MyPageLeft In {SelectPage, New PageInstanceLeft(), New PageDownloadLeft(), New PageSetupLeft(), New PageOtherLeft()}
+                ArrangeLayout(Page, 250, 600)
+                Dim Items = VisualDescendants(Page).OfType(Of MyListItem)().Where(Function(Item) Item.Visibility = Visibility.Visible).ToList()
+                AssertRegression(Items.Count > 0, "动画回归覆盖实际列表项：" & Page.GetType().Name, Results)
+                Page.TriggerShowAnimation()
+                Dim Transforms = Items.ToDictionary(Function(Item) Item, Function(Item) Item.RenderTransform)
+                For Each Item In Items
+                    Item.ApplyInteractionState(True, True, True)
+                    AssertRegression(TypeOf Item.RenderTransform Is TranslateTransform AndAlso Item.RenderTransform Is Transforms(Item),
+                        "入场期间悬停和按下保留页面位移变换：" & Page.GetType().Name, Results)
+                Next
+                AdvanceInteractionFrames()
+                For Each Item In Items
+                    Item.ApplyInteractionState(True, False, True)
+                Next
+                AdvanceInteractionFrames()
+                For Each Item In Items
+                    Item.ApplyInteractionState(False, False, False)
+                    AssertRegression(Item.RenderTransform Is Transforms(Item) AndAlso Math.Abs(DirectCast(Item.RenderTransform, TranslateTransform).X) < 0.01,
+                        "入场、移出和无动画刷新不覆盖根位移变换：" & Page.GetType().Name, Results)
+                Next
+                Page.TriggerHideAnimation()
+                AdvanceInteractionFrames()
+                AssertRegression(Items.All(Function(Item) Item.RenderTransform Is Transforms(Item)), "离场动画继续使用原位移变换：" & Page.GetType().Name, Results)
+            Next
+        Finally
+            AniGroups = PreviousGroups
+        End Try
+    End Sub
+
+    Private Sub AdvanceInteractionFrames()
+        For Index = 1 To 50
+            For Each Group In AniGroups.Values.ToList()
+                Group.StartTick = 0
+            Next
+            AniTimer(16)
+        Next
     End Sub
 
     Private Sub RunScrollingGlassChecks(Results As List(Of String))

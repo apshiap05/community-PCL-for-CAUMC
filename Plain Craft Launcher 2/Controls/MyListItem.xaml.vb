@@ -573,18 +573,25 @@ Public Class MyListItem
             ButtonStack.Opacity = If(Hovered, 1, 0)
             ColumnPaddingRight.Width = New GridLength(If(Hovered, Math.Max(MinPaddingRight, 5 + Buttons.Count * 25), MinPaddingRight))
         End If
-        Face.RenderTransform = New ScaleTransform(1, 1)
+        ' The page owns this item's root transform for its slide-in/out motion.
+        ' Press feedback only scales our background, never the page transform.
+        Dim FaceScale = TryCast(Face.RenderTransform, ScaleTransform)
+        If FaceScale Is Nothing Then
+            FaceScale = New ScaleTransform(1, 1)
+            Face.RenderTransform = FaceScale
+        End If
         If Animate Then
             AniStart({AaColor(Face, Border.BackgroundProperty, Fill, 160),
                 AaColor(Face, Border.BorderBrushProperty, Stroke, 160),
                 AaOpacity(Face, Opacity - Face.Opacity, 160,, New AniEaseOutFluent),
-                AaScaleTransform(Me, Scale - CType(RenderTransform, ScaleTransform).ScaleX, 180,, New AniEaseOutFluent)}, "ListItem Color " & Uuid)
+                AaScaleTransform(Face, Scale - FaceScale.ScaleX, 180,, New AniEaseOutFluent)}, "ListItem Color " & Uuid)
         Else
             AniStop("ListItem Color " & Uuid)
             Face.SetResourceReference(Border.BackgroundProperty, Fill)
             Face.SetResourceReference(Border.BorderBrushProperty, Stroke)
             Face.Opacity = Opacity
-            RenderTransform = New ScaleTransform(Scale, Scale)
+            FaceScale.ScaleX = Scale
+            FaceScale.ScaleY = Scale
         End If
     End Sub
 
