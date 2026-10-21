@@ -13,6 +13,7 @@ internal static class Program {
     }
     private static async Task Run(string fixture) {
         RunImportChecks();
+        await RunPackUpdateChecks();
         var parsed = ArticleParser.Parse(Html, ArticleClient.Source);
         Assert(All(parsed).Any(n => n.Kind == "heading" && n.Level == 1), "保留标题层级");
         Assert(!All(parsed).Any(n => n.Text.Contains("sidebar-not-content")), "只提取正文");
@@ -124,6 +125,70 @@ internal static class Program {
         }
         catch (Exception ex) { Console.Error.WriteLine(ex); return 1; }
     }
+    private static async Task RunPackUpdateChecks() {
+        var source = GuideCatalog.ForPost(5).Source;
+        var snapshot = new ArticleSnapshot { Source = source.AbsoluteUri, Nodes = ArticleParser.Parse(
+            "<div class='theme-doc-markdown'><p>整合包<a href='/a.zip'>A</a><a href='/a.zip#again'>重复 A</a></p>" +
+            "<ul><li><a href='/b.ZIP?download=1'>B</a></li></ul><a href='/a.zip?revision=2'>C</a>" +
+            "<a href='/a.zip.exe'>不是整合包</a></div>", source) };
+        var links = GuidePackUpdates.Links(snapshot);
+        Assert(links.Select(u => u.PathAndQuery).SequenceEqual(new[] { "/a.zip", "/b.ZIP?download=1", "/a.zip?revision=2" }), "启动检查按正文次序递归提取 ZIP、重复链接和锚点只匹配一次、保留不同查询链接");
+        Assert(GuidePackUpdates.Links(new ArticleSnapshot { Source = GuideCatalog.ForPost(2).Source.AbsoluteUri, Nodes = snapshot.Nodes }).Count == 0,
+            "启动检查仅匹配模组服指南，不扫描其他选项卡");
+        var handler = new Handler();
+        using var http = new HttpClient(handler);
+        handler.Queue.Enqueue(request => {
+            Assert(request.Method == HttpMethod.Head, "弹窗前只请求下载响应头");
+            var response = new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent([]) };
+            response.Content.Headers.ContentDisposition = new("attachment") { FileName = "fallback.zip", FileNameStar = "CAUMC 模组服 2.zip" };
+            return response;
+        });
+        Assert(await GuidePackUpdates.FileNameAsync(http, links[0]) == "CAUMC 模组服 2.zip", "弹窗名称优先使用服务器提供的中文文件名");
+        handler.Queue.Enqueue(_ => new(HttpStatusCode.MethodNotAllowed));
+        handler.Queue.Enqueue(request => {
+            Assert(request.Method == HttpMethod.Get, "服务器不支持 HEAD 时使用只读响应头的 GET");
+            return new(HttpStatusCode.OK) { RequestMessage = new(HttpMethod.Get, "https://files.example/redirected.zip"), Content = new ByteArrayContent([]) };
+        });
+        Assert(await GuidePackUpdates.FileNameAsync(http, links[0]) == "redirected.zip", "无文件名响应头时采用最终重定向文件名");
+        handler.Queue.Enqueue(_ => new(HttpStatusCode.ServiceUnavailable));
+        Assert(await GuidePackUpdates.FileNameAsync(http, new Uri("https://files.example/%E6%96%B0%E5%8C%85.zip")) == "新包.zip", "文件名探测失败时回退到解码后的 ZIP 链接文件名");
+        var imported = new HashSet<string>();
+        var prompted = new List<string>();
+        var installed = new List<string>();
+        var inFlight = false;
+        void Headers(int count) { for (var i = 0; i < count; i++) handler.Queue.Enqueue(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent([]) }); }
+        bool IsImported(Uri address) => imported.Contains(GuidePackUpdates.Key(address));
+        void MarkImported(Uri address) => imported.Add(GuidePackUpdates.Key(address));
+        Headers(3);
+        await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, update => {
+            Assert(!inFlight, "多个整合包按顺序先询问，再依次导入");
+            prompted.Add(update.Address.PathAndQuery);
+            return Task.FromResult(update.Address.AbsolutePath != "/a.zip" || update.Address.Query.Length > 0);
+        }, async update => {
+            Assert(prompted.Count == 3, "先完成所有链接的询问，长时间下载不会推迟后续弹窗");
+            inFlight = true;
+            await Task.Delay(5);
+            installed.Add(update.Address.PathAndQuery);
+            inFlight = false;
+            return update.Address.Query.Contains("revision=2"); // B simulates failure/cancellation.
+        }, MarkImported);
+        Assert(prompted.SequenceEqual(links.Select(u => u.PathAndQuery)), "相同链接一次、不同链接按顺序逐项询问");
+        Assert(installed.SequenceEqual(new[] { "/b.ZIP?download=1", "/a.zip?revision=2" }), "选择暂不不触发下载，选择导入沿用安装回调");
+        Assert(imported.SetEquals(new[] { GuidePackUpdates.Key(links[2]) }), "只有完整导入成功才记录，拒绝、失败或取消均不记为已导入");
+        prompted.Clear();
+        Headers(2);
+        await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, update => { prompted.Add(update.Address.PathAndQuery); return Task.FromResult(false); },
+            _ => throw new Exception("暂不应触发下载"), MarkImported);
+        Assert(prompted.SequenceEqual(new[] { "/a.zip", "/b.ZIP?download=1" }), "下次启动重试暂不和失败的整合包，成功导入的链接不再提醒");
+        Assert(handler.Queue.Count == 0, "已成功导入的链接不再探测或下载");
+        using var cancelled = new CancellationTokenSource();
+        cancelled.Cancel();
+        try {
+            await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, _ => throw new Exception("已取消不应弹窗"), _ => throw new Exception("已取消不应安装"), MarkImported, cancelled.Token);
+            throw new Exception("应响应取消");
+        } catch (OperationCanceledException) { Assert(true, "启动检查可取消，不留下已导入记录"); }
+    }
+
     private static void RunImportChecks() {
         var scratch = Path.Combine(Path.GetTempPath(), "caumc-import-" + Guid.NewGuid().ToString("N"));
         var launcher = Path.Combine(scratch, "旧 PCL");

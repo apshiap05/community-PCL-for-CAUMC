@@ -39,17 +39,17 @@ Public Module CaumcMigration
         End If
     End Sub
 
-    Public Sub CaumcOfferPclImport(Optional Always As Boolean = False)
-        If Not Always AndAlso Settings.Get(Of Boolean)("CaumcPclImportOffered") Then Return
+    Public Function CaumcOfferPclImport(Optional Always As Boolean = False) As LoaderCombo(Of String)
+        If Not Always AndAlso Settings.Get(Of Boolean)("CaumcPclImportOffered") Then Return Nothing
         If HasDownloadingTask() OrElse McInstanceLock.IsAnyLocked Then
             Hint("请在当前下载或安装任务完成后再导入旧 PCL", HintType.Blue)
-            Return
+            Return Nothing
         End If
         Settings.Set("CaumcPclImportOffered", True)
         If MyMsgBox("是否导入旧 PCL 中的所有游戏？" & vbCrLf & "选择原启动器所在文件夹后，将复制游戏版本、模组、存档和游戏配置，原文件会保留。",
-            "导入旧 PCL 游戏", "确认，开始导入", "取消，不导入", ForceWait:=True) <> 1 Then Return
+            "导入旧 PCL 游戏", "确认，开始导入", "取消，不导入", ForceWait:=True) <> 1 Then Return Nothing
         Dim Selected = Dialogs.SelectFolder("选择旧 PCL 启动器所在文件夹", False).FirstOrDefault()
-        If String.IsNullOrWhiteSpace(Selected) Then Return
+        If String.IsNullOrWhiteSpace(Selected) Then Return Nothing
         Try
             Dim Sources = PclDataImport.Discover(Selected).ToList()
             If Sources.Count = 0 Then Throw New IOException("该目录中没有找到含 versions 的游戏文件夹。请选择旧 PCL 所在目录或 .minecraft 目录。")
@@ -89,10 +89,12 @@ Public Module CaumcMigration
             Loader.Start(Selected)
             LoaderTaskbarAdd(Loader)
             RunInUi(Sub() FrmMain.BtnExtraDownload.ShowRefresh())
+            Return Loader
         Catch ex As Exception
             Logger.Error(ex, "导入旧 PCL 游戏失败", LogBehavior.Alert)
         End Try
-    End Sub
+        Return Nothing
+    End Function
 
     Public Sub CaumcTaskState(Loader As LoaderBase)
         Select Case Loader.State

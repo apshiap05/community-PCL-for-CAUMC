@@ -84,6 +84,7 @@ Public Class Settings
         New Setting("CaumcInitialized", False),
         New Setting("CaumcGuideDismissed", False),
         New Setting("CaumcPclImportOffered", False),
+        New Setting("CaumcImportedGuidePacks", "[]"),
         New Setting("LoginType", McLoginType.Auth, Source:=Sources.Registry),
         New Setting("LoginPageType", 0),
         New Setting("LaunchSkinID", "", Source:=Sources.Registry, OnChanged:=Sub() PageLaunchLeft.SkinLegacy.Start()),

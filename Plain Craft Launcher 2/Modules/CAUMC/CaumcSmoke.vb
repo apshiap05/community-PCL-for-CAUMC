@@ -103,6 +103,7 @@ Public Module CaumcSmoke
             CaumcRegression.Run(Results)
             If File.Exists(Paths.Base & "layout-tests") Then CaumcRegression.RunGlassPreviews(Results)
             RunPackDownloadTests(Results)
+            RunStartupPackTests(Results)
             Results.Add("PASS 单 EXE 内嵌依赖装载")
             RunModpackIntegration(Results)
             CaumcRegression.RunFabric(Results)
@@ -143,10 +144,76 @@ Public Module CaumcSmoke
             Check(File.ReadAllText(InstanceFolder & "\mods\fixture.jar") = "downloaded-mod-marker", "真实 HTTP 经 PCL 下载器下载后自动导入 Mod", Results)
             Check(File.ReadAllText(InstanceFolder & "\saves\fixture\level.dat") = "downloaded-world-marker", "自动导入完整保留整合包存档", Results)
             Check(Settings.Get(Of String)("LaunchFolders") <> Before AndAlso Settings.Get(Of String)("LaunchFolders").Contains("ImportedPacks"), "自动导入的游戏进入 PCL 文件夹列表", Results)
+            Check(GuidePackImported(Address), "手动点击 ZIP 成功导入后也记入启动检查记录", Results)
+            Settings.Entries("CaumcImportedGuidePacks").ValueCache.Clear()
+            IniClearCache("CAUMC")
+            Check(GuidePackImported(New Uri(Address.AbsoluteUri & "#duplicate")), "清空内存缓存后仍从磁盘识别已导入整合包，锚点不重复提醒", Results)
         Finally
             McFolderSelected = PreviousFolder
         End Try
     End Sub
+
+    Private Sub RunStartupPackTests(Results As List(Of String))
+        Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/pack.zip?startup=1")
+        Dim PreviousFolder = McFolderSelected
+        Dim GuideHandler As New StartupGuideHandler(Address)
+        Using Release As New ManualResetEventSlim(False), Http As New HttpClient(GuideHandler)
+            Dim OldImport As New LoaderCombo(Of String)("旧导入等待测试", {
+                New LoaderTask(Of String, Integer)("等待旧导入完成", Sub(Task) Release.Wait(Task.CreateCancellationToken()))})
+            Dim Prompted As Integer = 0
+            Try
+                OldImport.Start("fixture")
+                Dim Operation = System.Threading.Tasks.Task.Run(Async Function()
+                    Await CheckGuidePacksAsync(OldImport, Http,
+                        Function(Update)
+                            Check(Update.FileName = "CAUMC 启动检查.zip", "启动弹窗使用下载响应中的文件名", Results)
+                            Interlocked.Increment(Prompted)
+                            Return System.Threading.Tasks.Task.FromResult(True)
+                        End Function).ConfigureAwait(False)
+                End Function)
+                PumpUntilComplete(System.Threading.Tasks.Task.Delay(150))
+                Check(GuideHandler.Requests = 0 AndAlso Prompted = 0, "首次旧 PCL 导入结束前不检查或弹出新整合包提示", Results)
+                Release.Set()
+                PumpUntilComplete(Operation)
+                Operation.GetAwaiter().GetResult()
+                Check(Prompted = 1 AndAlso GuidePackImported(Address), "启动检查确认导入后经过真实下载器安装成功并持久记录", Results)
+                Dim Again = System.Threading.Tasks.Task.Run(Async Function()
+                    Await CheckGuidePacksAsync(Nothing, Http,
+                        Function(Update)
+                            Throw New Exception("已导入的整合包不应再次弹窗")
+                            Return System.Threading.Tasks.Task.FromResult(False)
+                        End Function).ConfigureAwait(False)
+                End Function)
+                PumpUntilComplete(Again)
+                Again.GetAwaiter().GetResult()
+                Check(GuideHandler.Requests = 3 AndAlso Prompted = 1, "后续启动重新请求最新指南，成功导入的重复链接不再询问或探测", Results)
+            Finally
+                Release.Set()
+                OldImport.Cancel()
+                McFolderSelected = PreviousFolder
+            End Try
+        End Using
+    End Sub
+
+    Private Class StartupGuideHandler
+        Inherits HttpMessageHandler
+        Private ReadOnly Address As Uri
+        Friend Requests As Integer
+        Friend Sub New(Pack As Uri)
+            Address = Pack
+        End Sub
+        Protected Overrides Function SendAsync(Request As HttpRequestMessage, Token As CancellationToken) As System.Threading.Tasks.Task(Of HttpResponseMessage)
+            Interlocked.Increment(Requests)
+            Dim Response As New HttpResponseMessage(HttpStatusCode.OK)
+            If Request.Method = HttpMethod.Head Then
+                Response.Content = New ByteArrayContent(New Byte() {})
+                Response.Content.Headers.ContentDisposition = New System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") With {.FileNameStar = "CAUMC 启动检查.zip"}
+            Else
+                Response.Content = New StringContent("<div class='theme-doc-markdown'><p>模组服整合包<a href='" & Address.AbsoluteUri & "'>下载</a><a href='" & Address.AbsoluteUri & "#duplicate'>重复</a></p></div>")
+            End If
+            Return System.Threading.Tasks.Task.FromResult(Response)
+        End Function
+    End Class
 
     Private Sub Check(Condition As Boolean, Name As String, Results As List(Of String))
         If Not Condition Then Throw New Exception(Name)

@@ -429,7 +429,8 @@ Public Class FormMain
                         EndProgram(False)
                 End Select
             End If
-            CaumcOfferPclImport()
+            Dim OldImport = CaumcOfferPclImport()
+            CheckGuidePacksAtStartup(OldImport)
             '启动加载器池
             Try
                 JavaInit() '延后到同意协议后再执行，避免在初次启动时进行进程操作
