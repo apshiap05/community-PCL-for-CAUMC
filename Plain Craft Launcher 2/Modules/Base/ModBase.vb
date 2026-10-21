@@ -15,7 +15,7 @@ Public Module ModBase
 #End If
 
     '版本信息
-    Public Const VersionDisplay As String = "PCL for CAUMC 1.1.0-preview / PCL " & VersionBaseName
+    Public Const VersionDisplay As String = "PCL for CAUMC 1.1.0 / PCL " & VersionBaseName
 #If DEBUG Then
     Public Const BuildTypeDisplay As String = "开发版"
     Public Const BuildType As BuildTypes = BuildTypes.Debug
