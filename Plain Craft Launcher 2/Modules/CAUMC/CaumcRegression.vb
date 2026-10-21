@@ -32,6 +32,7 @@ Friend Module CaumcRegression
             AssertRegression(GuidePanel.Children.OfType(Of MyCard)().All(Function(Item) Item.GlassMaterial = "Navigation"),
                 "首页指南和左侧登录区使用相同透明材质", Results)
             RunBackgroundChecks(Results)
+            RunLegacyBackgroundChecks(Results)
             RunWindowCornerChecks(Results)
             RenderGlassFrame(774, 434, 300, "home-minimum", Results)
 
@@ -83,6 +84,7 @@ Friend Module CaumcRegression
             ' sample the scene, follow its changes, and leave content unblurred.
             Dim OriginalBackground = Main.ImgBack.Background
             Dim OriginalOpacity = Main.ImgBack.Opacity
+            Dim OriginalVisibility = Main.ImgBack.Visibility
             Try
                 Dim Bands As New DrawingGroup()
                 For Index = 0 To 39
@@ -91,6 +93,7 @@ Friend Module CaumcRegression
                 Next
                 Main.ImgBack.Background = New DrawingBrush(Bands) With {.Stretch = Stretch.Fill}
                 Main.ImgBack.Opacity = 1
+                Main.ImgBack.Visibility = Visibility.Visible ' Explicit optical test pattern, not a player background.
                 Main.PanMainLeft.Child = Nothing
                 Dim SampleCard As New MyCard With {.Title = "清晰前景 · 背景采样", .Margin = New Thickness(60), .Height = 250, .VerticalAlignment = VerticalAlignment.Top}
                 SampleCard.Children.Add(New TextBlock With {.Text = "PCL for CAUMC", .FontSize = 32, .Margin = New Thickness(25, 80, 25, 25), .Effect = Nothing})
@@ -197,6 +200,7 @@ Friend Module CaumcRegression
             Finally
                 Main.ImgBack.Background = OriginalBackground
                 Main.ImgBack.Opacity = OriginalOpacity
+                Main.ImgBack.Visibility = OriginalVisibility
             End Try
         Finally
             Main.PanMainLeft.Child = OldLeft
@@ -409,6 +413,43 @@ Friend Module CaumcRegression
         Finally
             Backdrop.CompleteTransition()
             Backdrop.Opacity = OriginalOpacity
+        End Try
+    End Sub
+
+    Private Sub RunLegacyBackgroundChecks(Results As List(Of String))
+        Dim Main = FrmMain
+        Dim Keys = {"UiBackgroundColorful", "UiBackgroundOpacity", "UiBackgroundBlur"}
+        Dim Previous = Keys.ToDictionary(Function(Key) Key, Function(Key) Settings.GetSafe(Key))
+        Dim Pictures = Paths.Base & "PCL\Pictures\"
+        Directory.CreateDirectory(Pictures)
+        Dim Picture = Pictures & "legacy-background.png"
+        File.Copy(Paths.Base & "background-transition-0.png", Picture)
+        Try
+            Settings.Set("UiBackgroundColorful", False)
+            Settings.Set("UiBackgroundOpacity", 0)
+            Settings.Set("UiBackgroundBlur", 40)
+            ' Use the same refresh sequence as FormMain_Loaded, including the
+            ' old Pictures folder which used to cover the embedded slideshow.
+            Main.UpdateBackgroundAndTitleBar()
+            PageSetupUI.BackgroundRefresh(False, True)
+            CaumcGlass.RefreshTheme()
+            AssertRegression(Main.GlassAtmosphere.Opacity = 1 AndAlso Main.GlassAtmosphere.Effect Is Nothing,
+                "旧 PCL 关闭背景、零透明度和模糊设置不隐藏内置照片", Results)
+            AssertRegression(Main.ImgBack.Visibility = Visibility.Collapsed,
+                "旧 PCL Pictures 图片不遮住内置照片轮播", Results)
+            AssertRegression(Not Settings.Get(Of Boolean)(Keys(0)) AndAlso Settings.Get(Of Integer)(Keys(1)) = 0 AndAlso Settings.Get(Of Integer)(Keys(2)) = 40,
+                "显示内置照片时保留原版 PCL 背景配置", Results)
+            Dim Image As New Media.Imaging.RenderTargetBitmap(1000, 640, 96, 96, PixelFormats.Pbgra32)
+            Image.Render(Main.GlassScene)
+            AssertRegression(PixelDifference(Image, RenderBackdrop(Main.GlassAtmosphere, "legacy"), 500, 320) < 3,
+                "正常启动刷新后实际场景像素来自内置照片", Results)
+        Finally
+            File.Delete(Picture)
+            For Each Key In Keys
+                Settings.Set(Key, Previous(Key))
+            Next
+            Main.UpdateBackgroundAndTitleBar()
+            PageSetupUI.BackgroundRefresh(False, True)
         End Try
     End Sub
 

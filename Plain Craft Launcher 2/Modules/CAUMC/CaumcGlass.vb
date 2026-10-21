@@ -245,11 +245,21 @@ Friend Module CaumcGlass
         If FrmMain Is Nothing OrElse FrmMain.GlassScene Is Nothing Then Return
         FrmMain.PanTitle.Background = Brushes.Transparent
         FrmMain.PanForm.Background = Brushes.Transparent
-        FrmMain.GlassAtmosphere.Opacity = If(Settings.Get(Of Boolean)("UiBackgroundColorful"), Settings.Get(Of Integer)("UiBackgroundOpacity") / 1000, 0)
-        FrmMain.GlassAtmosphere.UpdateRotation()
+        RefreshPhotoBackdrop()
         FrmMain.LabTitleLogo.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush2")
         FrmMain.LabTitleInner.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
         FrmMain.ShapeTitleLogo.SetResourceReference(Shapes.Path.StrokeProperty, "ColorBrush2")
+    End Sub
+
+    Friend Sub RefreshPhotoBackdrop()
+        If FrmMain Is Nothing OrElse FrmMain.GlassAtmosphere Is Nothing Then Return
+        ' These photos belong to CAUMC's appearance. Keep upstream background
+        ' settings and Pictures files intact without applying them to this scene.
+        FrmMain.ImgBack.Visibility = Visibility.Collapsed
+        FrmMain.GlassAtmosphere.Visibility = Visibility.Visible
+        FrmMain.GlassAtmosphere.Opacity = 1
+        FrmMain.GlassAtmosphere.Effect = Nothing
+        FrmMain.GlassAtmosphere.UpdateRotation()
     End Sub
 End Module
 

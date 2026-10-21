@@ -687,9 +687,7 @@ Public Class FormMain
             ImgBack.Effect = New Effects.BlurEffect With {.Radius = BlurRadius}
         End If
         ImgBack.Margin = New Thickness(-BlurRadius / 1.8)
-        GlassAtmosphere.Opacity = If(Settings.Get(Of Boolean)("UiBackgroundColorful"), ImgBack.Opacity, 0)
-        GlassAtmosphere.Effect = If(BlurRadius = 1, Nothing, New Effects.BlurEffect With {.Radius = BlurRadius})
-        GlassAtmosphere.UpdateRotation()
+        CaumcGlass.RefreshPhotoBackdrop()
         '背景图片适应方式
         Dim BackgroundType As Integer = Settings.Get(Of Integer)("UiBackgroundSuit")
         If ImgBack.Background IsNot Nothing Then

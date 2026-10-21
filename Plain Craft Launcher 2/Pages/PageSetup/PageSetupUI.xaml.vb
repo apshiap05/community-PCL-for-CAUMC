@@ -106,49 +106,8 @@ Public Class PageSetupUI
     ''' <param name="IsHint">是否显示刷新提示。</param>
     ''' <param name="Refresh">是否刷新图片显示。</param>
     Public Shared Sub BackgroundRefresh(IsHint As Boolean, Refresh As Boolean)
-        Try
-
-            '获取可用的图片文件
-            DirectoryUtils.Create(Paths.Base & "PCL\Pictures\")
-            Dim Pic As New List(Of String)
-            For Each File In DirectoryUtils.EnumerateFiles(Paths.Base & "PCL\Pictures\", True)
-                Dim Extension As String = PathUtils.GetExtension(File)
-                If Extension <> "ini" AndAlso Extension <> "db" Then Pic.Add(File) '文件夹可能会被加入 .ini 和 thumbs.db
-            Next
-            '加载
-            If Not Pic.Any() Then
-                If Refresh Then
-                    If FrmMain.ImgBack.Visibility = Visibility.Collapsed Then
-                        If IsHint Then Hint("未检测到可用背景图片！", HintType.Red)
-                    Else
-                        FrmMain.ImgBack.Visibility = Visibility.Collapsed
-                        If IsHint Then Hint("背景图片已清除！", HintType.Green)
-                    End If
-                End If
-                If Not IsNothing(FrmSetupUI) Then FrmSetupUI.BackgroundRefreshUI(False, 0)
-            Else
-                If Refresh Then
-                    Dim Address As String = RandomOne(Pic)
-                    Try
-                        Logger.Info($"加载背景图片：{Address}")
-                        FrmMain.ImgBack.Background = New MyBitmap(Address)
-                        FrmMain.ImgBack.Visibility = Visibility.Visible
-                        FrmMain.UpdateBackgroundAndTitleBar()
-                        If IsHint Then Hint("背景图片已刷新：" & PathUtils.GetLastPart(Address), HintType.Green, False)
-                    Catch ex As Exception
-                        If ex.Message.Contains("参数无效") Then
-                            Logger.Error($"刷新背景图片失败，该图片文件可能并非标准格式。{vbCrLf}你可以尝试使用画图打开该文件并重新保存，这会让图片变为标准格式。{vbCrLf}文件：{Address}", LogBehavior.Alert)
-                        Else
-                            Logger.Error(ex, $"刷新背景图片失败（{Address}）", LogBehavior.Alert)
-                        End If
-                    End Try
-                End If
-                If Not IsNothing(FrmSetupUI) Then FrmSetupUI.BackgroundRefreshUI(True, Pic.Count)
-            End If
-
-        Catch ex As Exception
-            Logger.Error(ex, "刷新背景图片时出现未知错误")
-        End Try
+        CaumcGlass.RefreshPhotoBackdrop()
+        If IsHint Then Hint("内置照片轮播已刷新", HintType.Green)
     End Sub
 
     '顶部栏
