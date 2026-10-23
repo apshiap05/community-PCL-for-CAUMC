@@ -23,7 +23,12 @@ class Handler(BaseHTTPRequestHandler):
                     'arguments': {'game': [], 'jvm': []}, 'assetIndex': {'id': 'fixture'}
                 }))
                 pack.writestr('.minecraft/versions/caumc-download-fixture/PCL/Setup.ini', 'VersionArgumentIndieV2:True\n')
-                pack.writestr('.minecraft/versions/caumc-download-fixture/mods/fixture.jar', 'downloaded-mod-marker')
+                game_jar = io.BytesIO()
+                with zipfile.ZipFile(game_jar, 'w') as jar:
+                    jar.writestr('version.json', json.dumps({'id': '1.20.1', 'name': '1.20.1', 'release_target': '1.20.1'}))
+                pack.writestr('.minecraft/versions/caumc-download-fixture/caumc-download-fixture.jar', game_jar.getvalue())
+                pack.writestr('.minecraft/versions/caumc-download-fixture/mods/fixture.jar',
+                              'updated-mod-marker' if 'mismatch=1' in self.path else 'downloaded-mod-marker')
                 pack.writestr('.minecraft/versions/caumc-download-fixture/saves/fixture/level.dat', 'downloaded-world-marker')
             payload = archive.getvalue()
             self.send_response(200)

@@ -81,11 +81,11 @@ Public NotInheritable Class CaumcHomepage
                 End If
             End Sub
         Target.Children.Clear()
-        Dim Tabs As New Grid With {.Name = "CaumcGuideTabs", .Margin = New Thickness(0, 0, 0, 12)}
+        Dim Tabs As New Grid With {.Name = "CaumcGuideTabs", .Margin = New Thickness(0, 0, 0, 10)}
         For Index = 0 To GuideCatalog.All.Count - 1
             Tabs.ColumnDefinitions.Add(New ColumnDefinition())
             Dim TabGuide = GuideCatalog.All(Index)
-            Dim Tab As New MyButton With {.Text = TabGuide.Title, .Tag = TabGuide.PostId, .Height = 36,
+            Dim Tab As New MyButton With {.Text = TabGuide.Title, .Tag = TabGuide.PostId, .Height = 38,
                 .Margin = New Thickness(If(Index = 0, 0, 4), 0, If(Index = GuideCatalog.All.Count - 1, 0, 4), 0),
                 .ColorType = If(TabGuide.PostId = Guide.PostId, MyButton.ColorState.Highlight, MyButton.ColorState.Normal)}
             Tab.SetValue(Grid.ColumnProperty, Index)
@@ -93,22 +93,12 @@ Public NotInheritable Class CaumcHomepage
             Tabs.Children.Add(Tab)
         Next
         Target.Children.Add(Tabs)
+        Target.Children.Add(BuildActions(Target, Guide, Navigation))
         If Not Settings.Get(Of Boolean)("CaumcGuideDismissed") Then AddGuide(Target)
         ' Images change the article height asynchronously. A fixed-height card animation
         ' can clip later images and prevent the outer scroller from reaching them.
-        Dim Card As New MyCard With {.Title = CaumcName, .Margin = New Thickness(0, 0, 0, 15), .UseAnimation = False, .GlassMaterial = "Navigation"}
-        Dim Body As New StackPanel With {.Margin = New Thickness(18, 38, 18, 16)}
-        Dim Actions As New WrapPanel With {.Margin = New Thickness(0, 0, 0, 12)}
-        AddButton(Actions, "CAU 皮肤站", Sub() OpenWebsite(CaumcSkinSite))
-        AddButton(Actions, "导入整合包", Sub() ModpackInstall())
-        AddButton(Actions, "使用引导", Sub()
-                                          Settings.Set("CaumcGuideDismissed", False)
-                                          If Not Target.Children.OfType(Of MyCard).Any(Function(Item) Object.Equals(Item.Tag, "CAUMCGuide")) Then AddGuide(Target)
-                                      End Sub)
-        AddButton(Actions, "刷新", Sub() Navigation(Guide.Source))
-        Dim Original = AddButton(Actions, "浏览器查看原文", Sub() OpenWebsite(Guide.Source.AbsoluteUri))
-        Original.Tag = Guide.Source.AbsoluteUri
-        Body.Children.Add(Actions)
+        Dim Card As New MyCard With {.Margin = New Thickness(0, 0, 0, 15), .UseAnimation = False, .GlassMaterial = "Navigation"}
+        Dim Body As New StackPanel With {.Margin = New Thickness(18, 16, 18, 16)}
         Dim Status As New TextBlock With {.TextWrapping = TextWrapping.Wrap, .FontSize = 11, .Margin = New Thickness(0, 0, 0, 10)}
         Status.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrushGray3")
         Body.Children.Add(Status)
@@ -139,34 +129,72 @@ Public NotInheritable Class CaumcHomepage
         Return Status
     End Function
 
+    Private Shared Function BuildActions(Target As StackPanel, Guide As GuideDefinition, Navigation As Action(Of Uri)) As Grid
+        Dim Toolbar As New Grid With {.Name = "CaumcGuideActions", .Margin = New Thickness(0, 0, 0, 10)}
+        Toolbar.ColumnDefinitions.Add(New ColumnDefinition With {.Width = GridLength.Auto})
+        Toolbar.ColumnDefinitions.Add(New ColumnDefinition())
+        Toolbar.RowDefinitions.Add(New RowDefinition With {.Height = GridLength.Auto})
+        Toolbar.RowDefinitions.Add(New RowDefinition With {.Height = GridLength.Auto})
+        Dim Main As New WrapPanel()
+        AddButton(Main, "导入整合包", Sub() ModpackInstall()).IsPrimary = True
+        AddButton(Main, "CAU 皮肤站", Sub() OpenWebsite(CaumcSkinSite))
+        Dim Tools As New WrapPanel With {.HorizontalAlignment = HorizontalAlignment.Right}
+        Dim GuideButton = AddButton(Tools, If(Settings.Get(Of Boolean)("CaumcGuideDismissed"), "使用引导", "收起引导"))
+        AddHandler GuideButton.Click, Sub()
+                                          Dim Existing = Target.Children.OfType(Of MyCard).FirstOrDefault(Function(Item) Object.Equals(Item.Tag, "CAUMCGuide"))
+                                          Dim Show = Existing Is Nothing
+                                          Settings.Set("CaumcGuideDismissed", Not Show)
+                                          If Show Then
+                                              AddGuide(Target)
+                                          Else
+                                              Target.Children.Remove(Existing)
+                                          End If
+                                          GuideButton.Text = If(Show, "收起引导", "使用引导")
+                                      End Sub
+        AddButton(Tools, "刷新", Sub() Navigation(Guide.Source))
+        AddButton(Tools, "浏览器查看原文", Sub() OpenWebsite(Guide.Source.AbsoluteUri)).Tag = Guide.Source.AbsoluteUri
+        For Each Button In Tools.Children.OfType(Of MyButton)()
+            Button.Height = 28
+            Button.TextPadding = New Thickness(8, 0, 8, 0)
+            Button.LabText.FontSize = 11.5
+            Button.Margin = New Thickness(0, 2, 6, 6)
+        Next
+        Grid.SetColumn(Tools, 1)
+        Toolbar.Children.Add(Main)
+        Toolbar.Children.Add(Tools)
+        AddHandler Toolbar.SizeChanged,
+            Sub()
+                Main.Measure(New Size(Double.PositiveInfinity, Double.PositiveInfinity))
+                Tools.Measure(New Size(Double.PositiveInfinity, Double.PositiveInfinity))
+                Dim Stacked = Toolbar.ActualWidth < Main.DesiredSize.Width + Tools.DesiredSize.Width + 12
+                Grid.SetColumnSpan(Main, If(Stacked, 2, 1))
+                Grid.SetColumn(Tools, If(Stacked, 0, 1))
+                Grid.SetRow(Tools, If(Stacked, 1, 0))
+                Grid.SetColumnSpan(Tools, If(Stacked, 2, 1))
+                Tools.HorizontalAlignment = If(Stacked, HorizontalAlignment.Left, HorizontalAlignment.Right)
+            End Sub
+        Return Toolbar
+    End Function
+
     Private Shared Sub AddGuide(Target As StackPanel)
-        Dim Card As New MyCard With {.Title = "开始游玩 CAUMC", .Tag = "CAUMCGuide", .Margin = New Thickness(0, 0, 0, 15), .GlassMaterial = "Navigation"}
+        Dim Card As New MyCard With {.Title = "开始游玩 CAUMC", .Tag = "CAUMCGuide", .Margin = New Thickness(0, 0, 0, 12), .UseAnimation = False, .GlassMaterial = "Navigation"}
         Dim Body As New StackPanel With {.Margin = New Thickness(18, 38, 18, 16)}
         For Each Instruction In {
-            "1. 登录账号：左侧默认选择 CAU，输入皮肤站账号和密码，点击「登录 CAU 皮肤站」。还没有账号或角色时，请先前往 CAU 皮肤站注册并创建角色。",
-            "2. 导入整合包：从社区提供的渠道获取整合包，拖入启动器窗口，或点击下方「导入整合包」，按原有流程完成导入。",
-            "3. 进入服务器：选中导入的游戏版本并启动 Minecraft，在游戏的「多人游戏」中进入 CAUMC。",
-            "游戏下载、版本管理、Mod、设置和诊断仍可通过启动器原有入口使用。"}
+            "1. 登录：在左侧登录 CAU 账号；新玩家先前往皮肤站注册并创建角色。",
+            "2. 安装：点击模组服指南的 ZIP 链接自动安装，也可拖入本地整合包。",
+            "3. 进服：选好游戏版本并启动 Minecraft，从「多人游戏」进入服务器。"}
             Dim Text As New TextBlock With {.Text = Instruction, .TextWrapping = TextWrapping.Wrap, .LineHeight = 22,
                 .Margin = New Thickness(0, 0, 0, 8)}
             Text.SetResourceReference(TextBlock.ForegroundProperty, "ColorBrush1")
             Body.Children.Add(Text)
         Next
-        Dim Actions As New WrapPanel()
-        AddButton(Actions, "CAU 皮肤站", Sub() OpenWebsite(CaumcSkinSite))
-        AddButton(Actions, "导入整合包", Sub() ModpackInstall())
-        AddButton(Actions, "收起引导", Sub()
-                                          Settings.Set("CaumcGuideDismissed", True)
-                                          Target.Children.Remove(Card)
-                                      End Sub)
-        Body.Children.Add(Actions)
         Card.Children.Add(Body)
-        Target.Children.Insert(1, Card)
+        Target.Children.Insert(2, Card)
     End Sub
 
-    Private Shared Function AddButton(Panel As WrapPanel, Label As String, Action As Action) As MyButton
+    Private Shared Function AddButton(Panel As WrapPanel, Label As String, Optional Action As Action = Nothing) As MyButton
         Dim Button As New MyButton With {.Text = Label, .TextPadding = New Thickness(12, 0, 12, 0), .Height = 32, .Margin = New Thickness(0, 0, 8, 6)}
-        AddHandler Button.Click, Sub() Action()
+        If Action IsNot Nothing Then AddHandler Button.Click, Sub() Action()
         Panel.Children.Add(Button)
         Return Button
     End Function

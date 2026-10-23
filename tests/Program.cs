@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http;
+using System.IO.Compression;
 using PCLCS.CAUMC;
 
 internal static class Program {
@@ -13,6 +14,7 @@ internal static class Program {
     }
     private static async Task Run(string fixture) {
         RunImportChecks();
+        RunPackIdentityChecks();
         await RunPackUpdateChecks();
         var parsed = ArticleParser.Parse(Html, ArticleClient.Source);
         Assert(All(parsed).Any(n => n.Kind == "heading" && n.Level == 1), "保留标题层级");
@@ -156,6 +158,7 @@ internal static class Program {
         var prompted = new List<string>();
         var installed = new List<string>();
         var inFlight = false;
+        string? preferred = null;
         void Headers(int count) { for (var i = 0; i < count; i++) handler.Queue.Enqueue(_ => new(HttpStatusCode.OK) { Content = new ByteArrayContent([]) }); }
         bool IsImported(Uri address) => imported.Contains(GuidePackUpdates.Key(address));
         void MarkImported(Uri address) => imported.Add(GuidePackUpdates.Key(address));
@@ -171,10 +174,11 @@ internal static class Program {
             installed.Add(update.Address.PathAndQuery);
             inFlight = false;
             return update.Address.Query.Contains("revision=2"); // B simulates failure/cancellation.
-        }, MarkImported);
+        }, MarkImported, selectPreferred: address => preferred = GuidePackUpdates.Key(address));
         Assert(prompted.SequenceEqual(links.Select(u => u.PathAndQuery)), "相同链接一次、不同链接按顺序逐项询问");
         Assert(installed.SequenceEqual(new[] { "/b.ZIP?download=1", "/a.zip?revision=2" }), "选择暂不不触发下载，选择导入沿用安装回调");
         Assert(imported.SetEquals(new[] { GuidePackUpdates.Key(links[2]) }), "只有完整导入成功才记录，拒绝、失败或取消均不记为已导入");
+        Assert(preferred == GuidePackUpdates.Key(links[2]), "网页靠前的包失败时，默认选择下一个成功的包");
         prompted.Clear();
         Headers(2);
         await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, update => { prompted.Add(update.Address.PathAndQuery); return Task.FromResult(false); },
@@ -187,6 +191,60 @@ internal static class Program {
             await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, _ => throw new Exception("已取消不应弹窗"), _ => throw new Exception("已取消不应安装"), MarkImported, cancelled.Token);
             throw new Exception("应响应取消");
         } catch (OperationCanceledException) { Assert(true, "启动检查可取消，不留下已导入记录"); }
+        imported.Clear();
+        Headers(3);
+        await GuidePackUpdates.CheckAsync(snapshot, http, IsImported, _ => Task.FromResult(true), _ => Task.FromResult(true), MarkImported,
+            selectPreferred: address => preferred = GuidePackUpdates.Key(address));
+        Assert(preferred == GuidePackUpdates.Key(links[0]), "多个包成功后默认选择网页顺序最靠前的包，而非最后导入的包");
+    }
+
+    private static void RunPackIdentityChecks() {
+        var root = Path.Combine(Path.GetTempPath(), "caumc-identity-" + Guid.NewGuid().ToString("N"));
+        var game = Path.Combine(root, "existing", ".minecraft");
+        var version = Path.Combine(game, "versions", "1.20.1-Forge-test");
+        Directory.CreateDirectory(Path.Combine(version, "mods", "nested"));
+        Directory.CreateDirectory(Path.Combine(version, "PCL"));
+        File.WriteAllText(Path.Combine(version, "1.20.1-Forge-test.json"), "{\"id\":\"1.20.1-Forge-test\"}");
+        File.WriteAllText(Path.Combine(version, "PCL", "Setup.ini"), "VersionArgumentIndieV2:True\n");
+        File.WriteAllText(Path.Combine(version, "mods", "a.jar"), "same-mod");
+        File.WriteAllText(Path.Combine(version, "mods", "nested", "b.jar.disabled"), "disabled-mod");
+        File.WriteAllText(Path.Combine(version, "options.txt"), "player-options");
+        try {
+            using var stream = new MemoryStream();
+            using (var writer = new ZipArchive(stream, ZipArchiveMode.Create, true)) {
+                void Add(string path, string text) { using var output = new StreamWriter(writer.CreateEntry(path).Open()); output.Write(text); }
+                Add("bundle/.minecraft/versions/1.20.1/1.20.1.json", "{\"id\":\"1.20.1\"}");
+                Add("bundle/.minecraft/versions/1.20.1-Forge-test/1.20.1-Forge-test.json", "{\"id\":\"1.20.1-Forge-test\",\"inheritsFrom\":\"1.20.1\"}");
+                Add("bundle/.minecraft/versions/1.20.1-Forge-test/PCL/Setup.ini", "VersionArgumentIndieV2:True\n");
+                Add("bundle/.minecraft/versions/1.20.1-Forge-test/mods/a.jar", "same-mod");
+                Add("bundle/.minecraft/versions/1.20.1-Forge-test/mods/nested/b.jar.disabled", "disabled-mod");
+            }
+            stream.Position = 0;
+            using var archive = new ZipArchive(stream, ZipArchiveMode.Read);
+            var signature = GuidePackIdentity.Read(archive)!;
+            Assert(signature.VersionName == "1.20.1-Forge-test" && signature.ArchiveRoot == "bundle/.minecraft/", "从完整 PCL ZIP 识别有 Mod 的完整版本名，不把前面的原版依赖当成模组服");
+            Assert(signature.Mods.Count == 2 && signature.Fingerprint.Length == 64, "包内 Mod 逐文件 SHA256，包含嵌套目录和禁用文件状态");
+            Assert(GuidePackIdentity.Matches(signature, version, game, false), "完整版本名与全部 Mod 内容一致时可关联已有游戏");
+            File.WriteAllText(Path.Combine(version, "mods", "a.jar"), "next-mod");
+            Assert(!GuidePackIdentity.Matches(signature, version, game, false), "同名且同大小 Mod 内容变化也不能误关联");
+            File.WriteAllText(Path.Combine(version, "mods", "a.jar"), "same-mod");
+            File.WriteAllText(Path.Combine(version, "mods", "extra.jar"), "extra");
+            Assert(!GuidePackIdentity.Matches(signature, version, game, false), "玩家额外添加 Mod 时不关联");
+            File.Delete(Path.Combine(version, "mods", "extra.jar"));
+            File.Move(Path.Combine(version, "mods", "a.jar"), Path.Combine(version, "mods", "a.jar.disabled"));
+            Assert(!GuidePackIdentity.Matches(signature, version, game, false), "Mod 禁用状态不同也不关联");
+            File.Move(Path.Combine(version, "mods", "a.jar.disabled"), Path.Combine(version, "mods", "a.jar"));
+            File.WriteAllText(Path.Combine(version, "1.20.1-Forge-test.json"), "{\"id\":\"1.20.1\"}");
+            Assert(!GuidePackIdentity.Matches(signature, version, game, false), "不能只凭相同 Minecraft 基础版本或不符的 JSON ID 关联");
+            File.WriteAllText(Path.Combine(version, "1.20.1-Forge-test.json"), "{\"id\":\"1.20.1-Forge-test\"}");
+            Assert(GuidePackIdentity.Matches(signature, version, game, false) && File.ReadAllText(Path.Combine(version, "options.txt")) == "player-options", "关联检查恢复正常且不修改旧游戏个人配置");
+            using var cancelled = new CancellationTokenSource();
+            cancelled.Cancel();
+            try { GuidePackIdentity.Matches(signature, version, game, false, cancelled.Token); throw new Exception("应取消校验"); }
+            catch (OperationCanceledException) { Assert(true, "Mod 内容校验响应任务取消"); }
+            File.WriteAllText(Path.Combine(version, "PCL", "Setup.ini"), "VersionArgumentIndieV2:False\n");
+            Assert(!GuidePackIdentity.Matches(signature, version, game, true), "显式关闭版本隔离时按共享 Mod 目录校验，不误用版本内的 Mod");
+        } finally { Directory.Delete(root, true); }
     }
 
     private static void RunImportChecks() {

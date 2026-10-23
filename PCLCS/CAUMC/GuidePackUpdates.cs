@@ -60,7 +60,7 @@ public static class GuidePackUpdates {
 
     public static async Task CheckAsync(ArticleSnapshot snapshot, HttpClient http, Func<Uri, bool> imported,
         Func<GuidePackUpdate, Task<bool>> prompt, Func<GuidePackUpdate, Task<bool>> install,
-        Action<Uri> markImported, CancellationToken token = default) {
+        Action<Uri> markImported, CancellationToken token = default, Action<Uri>? selectPreferred = null) {
         var accepted = new List<GuidePackUpdate>();
         foreach (var address in Links(snapshot)) {
             token.ThrowIfCancellationRequested();
@@ -72,9 +72,14 @@ public static class GuidePackUpdates {
         }
         // Ask all questions in article order, then serialize imports so an earlier
         // installation cannot change the game folder underneath the next one.
+        Uri? firstSuccessful = null;
         foreach (var update in accepted) {
             token.ThrowIfCancellationRequested();
-            if (!imported(update.Address) && await install(update).ConfigureAwait(false)) markImported(update.Address);
+            if (imported(update.Address) || await install(update).ConfigureAwait(false)) {
+                markImported(update.Address);
+                firstSuccessful ??= update.Address;
+            }
         }
+        if (firstSuccessful is not null) selectPreferred?.Invoke(firstSuccessful);
     }
 }

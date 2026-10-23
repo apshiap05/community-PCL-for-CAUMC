@@ -6,5 +6,6 @@
   <ItemGroup>
     <ProjectReference Include="..\PCLCS\PCLCS.csproj" />
     <Reference Include="System.Net.Http" />
+    <Reference Include="System.IO.Compression" />
   </ItemGroup>
 </Project>

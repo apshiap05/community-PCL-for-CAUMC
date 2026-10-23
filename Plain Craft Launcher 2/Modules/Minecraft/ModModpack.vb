@@ -28,7 +28,7 @@ Public Module ModModpack
     ''' 构建并启动安装给定的整合包文件的加载器，并返回该加载器。若失败则抛出异常。
     ''' 必须在工作线程执行。
     ''' </summary>
-    Public Function ModpackInstall(File As String, Optional InstanceName As String = Nothing, Optional Logo As String = Nothing, Optional Automatic As Boolean = False) As LoaderCombo(Of String)
+    Public Function ModpackInstall(File As String, Optional InstanceName As String = Nothing, Optional Logo As String = Nothing, Optional Automatic As Boolean = False, Optional PreferredVersion As String = Nothing) As LoaderCombo(Of String)
         Logger.Info($"整合包安装请求：{If(File, "null")}")
         Dim Archive As ZipArchive = Nothing
         Dim ArchiveBaseFolder As String = ""
@@ -119,7 +119,7 @@ Public Module ModModpack
                     Return InstallPackLauncherPack(File, Archive, ArchiveBaseFolder, InstanceName, Logo, Automatic)
                 Case Else
                     Logger.Info("整合包种类：未能识别，假定为压缩包")
-                    Return InstallPackCompress(File, Archive, Automatic)
+                    Return InstallPackCompress(File, Archive, Automatic, PreferredVersion)
             End Select
         Finally
             If Archive IsNot Nothing Then Archive.Dispose()
@@ -790,13 +790,13 @@ Public Module ModModpack
     End Function
 
     '普通压缩包
-    Private Function InstallPackCompress(FileAddress As String, Archive As ZipArchive, Optional Automatic As Boolean = False) As LoaderCombo(Of String)
+    Private Function InstallPackCompress(FileAddress As String, Archive As ZipArchive, Optional Automatic As Boolean = False, Optional PreferredVersion As String = Nothing) As LoaderCombo(Of String)
         '尝试定位 .minecraft 文件夹：寻找形如 “/versions/XXX/XXX.json” 的路径
         Dim Match As Match = Nothing
         Dim Regex As New Regex("^.*\/(?=versions\/(?<ver>[^\/]+)\/(\k<ver>)\.json$)", RegexOptions.IgnoreCase)
         For Each Entry In Archive.Entries
             Dim EntryMatch = Regex.Match("/" & Entry.FullName)
-            If EntryMatch.Success Then
+            If EntryMatch.Success AndAlso (PreferredVersion Is Nothing OrElse String.Equals(EntryMatch.Groups("ver").Value, PreferredVersion, StringComparison.OrdinalIgnoreCase)) Then
                 Match = EntryMatch
                 Exit For
             End If

@@ -33,6 +33,7 @@ Friend Module CaumcRegression
                 "首页指南和左侧登录区使用相同透明材质", Results)
             RunBackgroundChecks(Results)
             RunLegacyBackgroundChecks(Results)
+            RunHomepageHierarchyChecks(Results)
             RunWindowCornerChecks(Results)
             RenderGlassFrame(774, 434, 300, "home-minimum", Results)
 
@@ -416,6 +417,52 @@ Friend Module CaumcRegression
         End Try
     End Sub
 
+    Private Sub RunHomepageHierarchyChecks(Results As List(Of String))
+        Dim Previous = Settings.Get(Of Boolean)("CaumcGuideDismissed")
+        Try
+            For Each Guide In PCLCS.CAUMC.GuideCatalog.All
+                Settings.Set("CaumcGuideDismissed", False)
+                Dim Fixture = Paths.Base & If(Guide.PostId = 2, "homepage.html", If(Guide.PostId = 5, "guide-mods.html", "guide-skin.html"))
+                Dim Snapshot As New PCLCS.CAUMC.ArticleSnapshot With {.Source = Guide.Source.AbsoluteUri,
+                    .Nodes = PCLCS.CAUMC.ArticleParser.Parse(File.ReadAllText(Fixture), Guide.Source)}
+                Dim Panel As New StackPanel()
+                Dim Status = CaumcHomepage.BuildPage(Panel, Snapshot, Guide.PostId)
+                Status.Text = "已更新"
+                For Each Width In {700, 390}
+                    ArrangeLayout(Panel, Width, 1000)
+                    Dim Toolbar = Panel.Children.OfType(Of Grid).Single(Function(Item) Item.Name = "CaumcGuideActions")
+                    Dim Buttons = VisualDescendants(Panel).OfType(Of MyButton)().ToList()
+                    Dim Actions = VisualDescendants(Toolbar).OfType(Of MyButton)().ToList()
+                    AssertRegression(Buttons.Where(Function(Item) Item.Text = "CAU 皮肤站").Count() = 1 AndAlso Buttons.Where(Function(Item) Item.Text = "导入整合包").Count() = 1,
+                        "首页常用入口仅出现一次，展开引导也不重复：" & Guide.PostId & "/" & Width, Results)
+                    AssertRegression(Actions.Count = 5 AndAlso Actions.Where(Function(Item) Item.IsPrimary).Count() = 1 AndAlso
+                        Actions.Single(Function(Item) Item.Text = "浏览器查看原文").Tag = Guide.Source.AbsoluteUri,
+                        "公共操作、辅助工具层次分明且每页保留原文入口：" & Guide.PostId & "/" & Width, Results)
+                    AssertRegression(Actions.All(Function(Item) LayoutBounds(Item, Panel).Left >= 0 AndAlso LayoutBounds(Item, Panel).Right <= Width + 1) AndAlso
+                        Actions.All(Function(Item) Actions.Where(Function(Other) Other IsNot Item).All(Function(Other) Not LayoutBounds(Item, Panel).IntersectsWith(LayoutBounds(Other, Panel)))),
+                        "宽窄布局下工具按钮不越界、不重叠：" & Guide.PostId & "/" & Width, Results)
+                    SaveLayoutPreview(Panel, Width, 700, "guide-hierarchy-" & Guide.PostId & "-" & Width)
+                Next
+                Dim Toggle = VisualDescendants(Panel).OfType(Of MyButton)().Single(Function(Item) Item.Text = "收起引导")
+                For Index = 1 To 4
+                    Toggle.RaiseEvent(New MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) With {.RoutedEvent = UIElement.MouseLeftButtonDownEvent})
+                    Toggle.RaiseEvent(New MouseButtonEventArgs(Mouse.PrimaryDevice, 0, MouseButton.Left) With {.RoutedEvent = UIElement.MouseLeftButtonUpEvent})
+                    AssertRegression(Panel.Children.OfType(Of MyCard).Count(Function(Item) Object.Equals(Item.Tag, "CAUMCGuide")) = If(Index Mod 2 = 0, 1, 0),
+                        "反复展开、收起不产生重复引导或按钮：" & Guide.PostId & "/" & Index, Results)
+                Next
+                Dim PreviousRight = FrmMain.PanMainRight.Child
+                Try
+                    FrmMain.PanMainRight.Child = New MyScrollViewer With {.Content = Panel, .VerticalScrollBarVisibility = ScrollBarVisibility.Auto}
+                    RenderGlassFrame(1000, 640, 300, "home-guide-" & Guide.PostId, Results)
+                Finally
+                    FrmMain.PanMainRight.Child = PreviousRight
+                End Try
+            Next
+        Finally
+            Settings.Set("CaumcGuideDismissed", Previous)
+        End Try
+    End Sub
+
     Private Sub RunLegacyBackgroundChecks(Results As List(Of String))
         Dim Main = FrmMain
         Dim Keys = {"UiBackgroundColorful", "UiBackgroundOpacity", "UiBackgroundBlur"}
@@ -753,7 +800,8 @@ Friend Module CaumcRegression
                 AssertRegression(Tabs.All(Function(Tab) LayoutBounds(Tab, Viewer).Left >= 24 AndAlso LayoutBounds(Tab, Viewer).Right <= Width - 24 AndAlso
                     Tab.LabText.DesiredSize.Width <= Tab.ActualWidth), "最小窗口下三个指南标题完整且不越界：" & Guide.PostId, Results)
                 Dim Body = Panel.Children.OfType(Of MyCard).Last().Children.OfType(Of StackPanel).Single()
-                Dim Actions = Body.Children.OfType(Of WrapPanel).Single().Children.OfType(Of MyButton).ToList()
+                Dim Toolbar = Panel.Children.OfType(Of Grid).Single(Function(Item) Item.Name = "CaumcGuideActions")
+                Dim Actions = VisualDescendants(Toolbar).OfType(Of MyButton).ToList()
                 AssertRegression(Actions.All(Function(Action) LayoutBounds(Action, Viewer).Left >= 24 AndAlso LayoutBounds(Action, Viewer).Right <= Width - 24),
                     "最小窗口下工具按钮换行后不越界：" & Guide.PostId, Results)
                 SaveLayoutPreview(Viewer, Width, Height, "guide-minimum-" & Guide.PostId)

@@ -104,6 +104,7 @@ Public Module CaumcSmoke
             If File.Exists(Paths.Base & "layout-tests") Then CaumcRegression.RunGlassPreviews(Results)
             RunPackDownloadTests(Results)
             RunStartupPackTests(Results)
+            RunPackBindingTests(Results)
             Results.Add("PASS 单 EXE 内嵌依赖装载")
             RunModpackIntegration(Results)
             CaumcRegression.RunFabric(Results)
@@ -198,9 +199,11 @@ Public Module CaumcSmoke
     Private Class StartupGuideHandler
         Inherits HttpMessageHandler
         Private ReadOnly Address As Uri
+        Private ReadOnly Second As Uri
         Friend Requests As Integer
-        Friend Sub New(Pack As Uri)
+        Friend Sub New(Pack As Uri, Optional NextPack As Uri = Nothing)
             Address = Pack
+            Second = NextPack
         End Sub
         Protected Overrides Function SendAsync(Request As HttpRequestMessage, Token As CancellationToken) As System.Threading.Tasks.Task(Of HttpResponseMessage)
             Interlocked.Increment(Requests)
@@ -210,10 +213,106 @@ Public Module CaumcSmoke
                 Response.Content.Headers.ContentDisposition = New System.Net.Http.Headers.ContentDispositionHeaderValue("attachment") With {.FileNameStar = "CAUMC 启动检查.zip"}
             Else
                 Response.Content = New StringContent("<div class='theme-doc-markdown'><p>模组服整合包<a href='" & Address.AbsoluteUri & "'>下载</a><a href='" & Address.AbsoluteUri & "#duplicate'>重复</a></p></div>")
+                If Second IsNot Nothing Then Response.Content = New StringContent("<div class='theme-doc-markdown'><p>模组服整合包<a href='" & Address.AbsoluteUri & "'>第一个包</a><a href='" & Second.AbsoluteUri.Replace("&", "&amp;") & "'>第二个包</a></p></div>")
             End If
             Return System.Threading.Tasks.Task.FromResult(Response)
         End Function
     End Class
+
+    Private Sub RunPackBindingTests(Results As List(Of String))
+        Dim BaseUrl As New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt"))
+        Dim PreviousFolder = McFolderSelected
+        Dim PreviousPicker = ExistingVersionPicker
+        Dim Source = Directory.EnumerateFiles(Paths.Base & "ImportedPacks", "caumc-download-fixture.json", SearchOption.AllDirectories).Single()
+        Dim First = Paths.Base & "binding-fixtures\A\.minecraft\versions\caumc-download-fixture"
+        Dim Second = Paths.Base & "binding-fixtures\B\.minecraft\versions\caumc-download-fixture"
+        For Each Candidate In {First, Second}
+            Directory.CreateDirectory(Candidate & "\mods")
+            Directory.CreateDirectory(Candidate & "\PCL")
+            Directory.CreateDirectory(Candidate & "\saves\my-world")
+            File.Copy(Source, Candidate & "\caumc-download-fixture.json")
+            File.Copy(Path.ChangeExtension(Source, ".jar"), Candidate & "\caumc-download-fixture.jar")
+            File.WriteAllText(Candidate & "\mods\fixture.jar", "downloaded-mod-marker")
+            File.WriteAllText(Candidate & "\PCL\Setup.ini", "VersionArgumentIndieV2:True" & vbCrLf)
+            File.WriteAllText(Candidate & "\options.txt", "player-personal-options")
+            File.WriteAllText(Candidate & "\saves\my-world\level.dat", "player-world")
+            CaumcRegisterGameFolder(Directory.GetParent(Directory.GetParent(Candidate).FullName).FullName, "关联测试")
+        Next
+        Dim Before = Directory.GetDirectories(Paths.Base & "ImportedPacks").Length
+        Dim Choices As Integer = 0
+        Try
+            ExistingVersionPicker = Function(Candidates)
+                                        Check(Candidates.Contains(First) AndAlso Candidates.Contains(Second), "多个已有目录中找到同名、同 Mod 内容的版本", Results)
+                                        Choices += 1
+                                        Return Second
+                                    End Function
+            Dim Linked As New Uri(BaseUrl, "/pack.zip?association=first")
+            WaitGuidePack(DownloadGuidePack(Linked), LoadState.Finished)
+            Check(Choices = 1 AndAlso Directory.GetDirectories(Paths.Base & "ImportedPacks").Length = Before, "多个匹配项选择后复用已有版本，不再次解压安装", Results)
+            Settings.Entries("CaumcGuidePackBindings").ValueCache.Clear()
+            Settings.Entries("CaumcGuidePackChoices").ValueCache.Clear()
+            IniClearCache("CAUMC")
+            Dim Renamed As New Uri(BaseUrl, "/pack.zip?association=renamed")
+            WaitGuidePack(DownloadGuidePack(Renamed), LoadState.Finished)
+            Check(Choices = 1 AndAlso GuidePackImported(Renamed), "清空内存后记住关联，同一版本和 Mod 内容无需重复选择", Results)
+
+            Dim Leading As New Uri(BaseUrl, "/pack.zip?batch=first")
+            Dim Updated As New Uri(BaseUrl, "/pack.zip?mismatch=1&batch=second")
+            Using Http As New HttpClient(New StartupGuideHandler(Leading, Updated))
+                Dim Operation = System.Threading.Tasks.Task.Run(Async Function()
+                    Await CheckGuidePacksAsync(Nothing, Http, Function(Update) System.Threading.Tasks.Task.FromResult(True)).ConfigureAwait(False)
+                End Function)
+                PumpUntilComplete(Operation)
+                Operation.GetAwaiter().GetResult()
+            End Using
+            Check(PathUtils.IsSame(McFolderSelected, Directory.GetParent(Directory.GetParent(Second).FullName).FullName) AndAlso
+                ReadIni(McFolderSelected & "PCL.ini", "Version") = "caumc-download-fixture", "两包成功后回到网页最靠前的包，不停在最后安装的包", Results)
+            Check(Directory.GetDirectories(Paths.Base & "ImportedPacks").Length = Before + 1 AndAlso GuidePackImported(Updated), "同名版本 Mod 内容不同则独立安装新包，旧版全部保留", Results)
+            Check({First, Second}.All(Function(Candidate) File.ReadAllText(Candidate & "\options.txt") = "player-personal-options" AndAlso
+                File.ReadAllText(Candidate & "\saves\my-world\level.dat") = "player-world" AndAlso
+                File.ReadAllText(Candidate & "\mods\fixture.jar") = "downloaded-mod-marker"), "关联和独立安装均不修改旧版个人设置、存档或 Mod", Results)
+            SelectGuidePack(Updated)
+            Dim NewVersion = McFolderSelected & "versions\caumc-download-fixture\"
+            Check(File.ReadAllText(NewVersion & "mods\fixture.jar") = "updated-mod-marker" AndAlso Not File.Exists(NewVersion & "options.txt"), "新版使用包内 Mod 和原始配置，不迁移旧版个人内容", Results)
+            Dim Json = Second & "\caumc-download-fixture.json"
+            File.Move(Json, Json & ".temporarily-missing")
+            Try
+                Check(Not GuidePackImported(Linked), "关联版本被删除或移走时不继续误判为已安装", Results)
+            Finally
+                File.Move(Json & ".temporarily-missing", Json)
+            End Try
+            Dim SavedBindings = Settings.Get(Of String)("CaumcGuidePackBindings")
+            Dim SavedChoices = Settings.Get(Of String)("CaumcGuidePackChoices")
+            Try
+                Settings.Set("CaumcGuidePackBindings", "{}")
+                Settings.Set("CaumcGuidePackChoices", "{}")
+                ExistingVersionPicker = Function(Candidates) Nothing
+                Dim Canceled As New Uri(BaseUrl, "/pack.zip?association=canceled")
+                WaitGuidePack(DownloadGuidePack(Canceled), LoadState.Canceled)
+                Check(Not GuidePackImported(Canceled) AndAlso Directory.GetDirectories(Paths.Base & "ImportedPacks").Length = Before + 1,
+                    "取消多个版本的选择后不安装、不记录成功，下次可重试", Results)
+            Finally
+                Settings.Set("CaumcGuidePackBindings", SavedBindings)
+                Settings.Set("CaumcGuidePackChoices", SavedChoices)
+            End Try
+        Finally
+            ExistingVersionPicker = PreviousPicker
+            McFolderSelected = PreviousFolder
+        End Try
+    End Sub
+
+    Private Sub WaitGuidePack(Loader As LoaderCombo(Of String), Expected As LoadState)
+        Dim Operation = System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(45)
+            While Loader.State = LoadState.Loading OrElse Loader.State = LoadState.Waiting
+                If DateTime.UtcNow > Deadline Then Loader.Cancel() : Throw New TimeoutException("关联导入测试超时")
+                Thread.Sleep(20)
+            End While
+            If Loader.State <> Expected Then Throw New IOException("关联导入状态错误：" & Loader.State.ToString(), Loader.Error)
+        End Sub)
+        PumpUntilComplete(Operation)
+        Operation.GetAwaiter().GetResult()
+    End Sub
 
     Private Sub Check(Condition As Boolean, Name As String, Results As List(Of String))
         If Not Condition Then Throw New Exception(Name)
@@ -536,7 +635,7 @@ Public Module CaumcSmoke
     End Function
 
     Private Function GuideOriginalSource(Panel As StackPanel) As String
-        Return CStr(GuideBody(Panel).Children.OfType(Of WrapPanel).First().Children.OfType(Of MyButton).Single(Function(Item) Item.Text = "浏览器查看原文").Tag)
+        Return CStr(Panel.Children.OfType(Of Grid).Single(Function(Item) Item.Name = "CaumcGuideActions").Children.OfType(Of WrapPanel)().SelectMany(Function(Item) Item.Children.OfType(Of MyButton)()).Single(Function(Item) Item.Text = "浏览器查看原文").Tag)
     End Function
 
     Private Function ClickGuideLink(Panel As StackPanel, PostId As Integer) As RequestNavigateEventArgs
