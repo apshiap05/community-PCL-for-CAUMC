@@ -85,7 +85,7 @@ public sealed class ArticleClient {
         this.client = client;
         this.cacheFile = cacheFile;
         this.source = source ?? Source;
-        if (!GuideCatalog.All.Any(g => g.Source == this.source)) throw new ArgumentException("未配置的指南地址", nameof(source));
+        if (!GuideCatalog.All.Any(g => g.Source == this.source) && this.source != LauncherUpdates.Source) throw new ArgumentException("未配置的指南地址", nameof(source));
     }
 
     public ArticleSnapshot? ReadCache() {

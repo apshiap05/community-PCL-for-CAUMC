@@ -111,6 +111,7 @@ Public Module CaumcSmoke
             RunStartupPackTests(Results)
             RunPackBindingTests(Results)
             RunTaskCenterTests(Results)
+            If File.Exists(Paths.Base & "launcher-update.exe") Then RunLauncherUpdateTests(Results)
             If File.Exists(Paths.Base & "curseforge-live-tests") Then RunCurseForgeLiveTests(Results)
             Results.Add("PASS 单 EXE 内嵌依赖装载")
             RunModpackIntegration(Results)
@@ -362,6 +363,23 @@ Public Module CaumcSmoke
                 PumpUntilComplete(Again)
                 Again.GetAwaiter().GetResult()
                 Check(GuideHandler.Requests = 3 AndAlso Prompted = 1, "后续启动重新请求最新指南，成功导入的重复链接不再询问或探测", Results)
+                Dim IgnoredAddress As New Uri(Address.AbsoluteUri & "&ignored=1")
+                IgnoreGuidePack(IgnoredAddress)
+                Settings.Entries("CaumcIgnoredGuidePacks").ValueCache.Clear()
+                IniClearCache("CAUMC")
+                Check(GuidePackIgnored(New Uri(IgnoredAddress.AbsoluteUri & "#same")) AndAlso Not GuidePackImported(IgnoredAddress), "不再提醒单独持久记录，不伪装为已导入", Results)
+                Using IgnoredHttp As New HttpClient(New StartupGuideHandler(IgnoredAddress))
+                    Dim IgnoredCheck = CheckGuidePacksAsync(Nothing, IgnoredHttp, Function(Update)
+                        Throw New Exception("已忽略的整合包不应再次弹窗")
+                        Return System.Threading.Tasks.Task.FromResult(False)
+                    End Function)
+                    PumpUntilComplete(IgnoredCheck)
+                    IgnoredCheck.GetAwaiter().GetResult()
+                End Using
+                Check(Not GuidePackIgnored(New Uri(Address.AbsoluteUri & "&ignored=2")), "不同 ZIP 链接仍视为新整合包", Results)
+                Dim ManualImport = DownloadGuidePack(IgnoredAddress, "手动导入已忽略的包.zip")
+                PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub() ManualImport.WaitForExit()))
+                Check(ManualImport.State = LoadState.Finished AndAlso GuidePackImported(IgnoredAddress), "不再提醒后仍能手动下载并导入", Results)
             Finally
                 Release.Set()
                 OldImport.Cancel()
@@ -369,6 +387,110 @@ Public Module CaumcSmoke
             End Try
         End Using
     End Sub
+
+    Private Sub RunLauncherUpdateTests(Results As List(Of String))
+        Dim PreviousPrompt = CaumcLauncherUpdate.UpdatePrompt
+        Dim PreviousRestart = CaumcLauncherUpdate.RestartPrompt
+        Dim PreviousBusy = CaumcLauncherUpdate.Busy
+        Dim PreviousHelper = CaumcLauncherUpdate.HelperStarter
+        Dim PromptCount = 0, RestartCount = 0
+        CaumcLauncherUpdate.ResetForTests()
+        Settings.Set("CaumcReadyLauncherUpdate", "{}")
+        Try
+            CaumcLauncherUpdate.UpdatePrompt = Function(Release)
+                PromptCount += 1
+                Return 3
+            End Function
+            Using Http As New HttpClient(New LauncherArticleHandler())
+                PumpUntilComplete(CaumcLauncherUpdate.CheckAsync(False, Http))
+                Check(PromptCount = 1 AndAlso CaumcLauncherUpdate.Ignored("99.0.0"), "启动器三个按钮中的不再提醒按版本保存", Results)
+                Settings.Entries("CaumcIgnoredLauncherVersions").ValueCache.Clear()
+                IniClearCache("CAUMC")
+                PumpUntilComplete(CaumcLauncherUpdate.CheckAsync(False, Http))
+                Check(PromptCount = 1, "后续自动检查跳过已忽略版本", Results)
+                CaumcLauncherUpdate.UpdatePrompt = Function(Release)
+                    PromptCount += 1
+                    Return 2
+                End Function
+                PumpUntilComplete(CaumcLauncherUpdate.CheckAsync(True, Http))
+                Check(PromptCount = 2, "手动检查仍可显示已忽略版本", Results)
+            End Using
+            Using Http As New HttpClient(New LauncherArticleHandler With {.Fail = True})
+                PumpUntilComplete(CaumcLauncherUpdate.CheckAsync(False, Http))
+                Check(PromptCount = 2, "自动检查失败不弹窗，启动流程可继续", Results)
+            End Using
+            CaumcLauncherUpdate.Busy = Function() True
+            CaumcLauncherUpdate.RestartPrompt = Function(Version)
+                RestartCount += 1
+                Return False
+            End Function
+            Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/launcher-update.exe")
+            Dim Loader = CaumcLauncherUpdate.StartDownload(New LauncherRelease With {.Version = "99.0.0.0", .Url = Address.AbsoluteUri})
+            PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub() Loader.WaitForExit()))
+            CaumcTaskCenter.CheckpointNow()
+            Dim Record = CaumcTaskCenter.Snapshot().Single(Function(Item) Item.Id = Loader.RecoveryId)
+            Check(Record.Kind = "启动器更新" AndAlso Record.State = "succeeded", "真实 EXE 通过原生下载器下载并记入任务中心", Results)
+            Dim Ready = CaumcLauncherUpdate.ReadReady()
+            Check(Ready IsNot Nothing AndAlso File.Exists(CStr(Ready("archive"))), "下载完成保留已校验的 EXE 等待重启确认", Results)
+            Dim RecoveryPath = Paths.Base & "PCL\Updates\" & Guid.NewGuid().ToString("N") & ".exe"
+            Dim Recipe = CType(Ready.DeepClone(), JObject)
+            Recipe("archive") = RecoveryPath
+            Dim Interrupted As New TaskRecord With {.Id = Guid.NewGuid().ToString("N"), .Name = "恢复启动器更新测试", .State = "interrupted", .Recipe = Recipe,
+                .Downloads = New List(Of DownloadSpec) From {New DownloadSpec With {.Path = RecoveryPath, .Urls = {Address.AbsoluteUri}, .MinSize = 1024}}}
+            CaumcTaskCenter.SeedForTests(Interrupted)
+            CaumcTaskCenter.ResumeTask(Interrupted.Id)
+            PumpUntilComplete(System.Threading.Tasks.Task.Run(Async Function() As System.Threading.Tasks.Task
+                For Attempt = 1 To 300
+                    Dim Saved = CaumcTaskCenter.Snapshot().Single(Function(Item) Item.Id = Interrupted.Id)
+                    If Saved.State = "succeeded" Then Return
+                    If Saved.State = "failed" Then Throw New Exception(Saved.Error)
+                    Await System.Threading.Tasks.Task.Delay(50)
+                Next
+                Throw New TimeoutException("恢复启动器更新超时")
+            End Function))
+            Check(File.Exists(RecoveryPath) AndAlso CStr(CaumcLauncherUpdate.ReadReady()("archive")) = RecoveryPath, "重启后的更新任务可从任务中心恢复并再次进入待安装状态", Results)
+            CaumcLauncherUpdate.RememberGame(Process.GetCurrentProcess())
+            Check(CaumcLauncherUpdate.HasRememberedGame(), "跨启动的游戏进程记录核对 PID 和创建时间", Results)
+            Settings.Set("CaumcRunningMinecraft", "[]")
+            CaumcLauncherUpdate.ResetForTests(True)
+            CaumcLauncherUpdate.TryPromptReady()
+            Check(RestartCount = 0, "游戏或任务忙碌时不弹出重启安装确认", Results)
+            CaumcLauncherUpdate.Busy = Function() False
+            CaumcLauncherUpdate.TryPromptReady()
+            CaumcLauncherUpdate.TryPromptReady()
+            Check(RestartCount = 1 AndAlso CaumcLauncherUpdate.ReadReady() IsNot Nothing, "选择稍后安装后本次不催促，并保留下载文件", Results)
+            CaumcLauncherUpdate.ResetForTests(True)
+            CaumcLauncherUpdate.TryPromptReady()
+            Check(RestartCount = 2, "下次会话可直接确认安装，无需重新下载", Results)
+            CaumcLauncherUpdate.HelperStarter = Function(Info)
+                Throw New System.ComponentModel.Win32Exception(1223)
+            End Function
+            CaumcLauncherUpdate.RestartPrompt = Function(Version) True
+            CaumcLauncherUpdate.ResetForTests(True)
+            CaumcLauncherUpdate.TryPromptReady()
+            Check(CaumcLauncherUpdate.ReadReady() IsNot Nothing AndAlso Not Directory.EnumerateDirectories(Paths.Base & "selftest-update-stage").Any(), "拒绝管理员授权时保留已下载更新，清理未启用的辅助程序", Results)
+            Dim Dialog As New MyMsgText(New MyMsgBoxConverter With {.Title = "启动器更新", .Text = "当前版本 1.3.0，新版本 99.0.0", .Button1 = "现在更新", .Button2 = "稍后更新", .Button3 = "这个版本不再提醒", .LinkText = "查看发布页面", .LinkUrl = LauncherUpdates.Source.AbsoluteUri})
+            Check(Dialog.LabCaption.Inlines.OfType(Of Documents.Hyperlink)().Count() = 1 AndAlso Dialog.Btn3.Text = "这个版本不再提醒", "更新弹窗保留三个选择和独立发布页面链接", Results)
+        Finally
+            CaumcLauncherUpdate.ResetForTests()
+            CaumcLauncherUpdate.UpdatePrompt = PreviousPrompt
+            CaumcLauncherUpdate.RestartPrompt = PreviousRestart
+            CaumcLauncherUpdate.Busy = PreviousBusy
+            CaumcLauncherUpdate.HelperStarter = PreviousHelper
+            Settings.Set("CaumcReadyLauncherUpdate", "{}")
+            Settings.Set("CaumcRunningMinecraft", "[]")
+        End Try
+    End Sub
+
+    Private Class LauncherArticleHandler
+        Inherits HttpMessageHandler
+        Friend Fail As Boolean
+        Protected Overrides Function SendAsync(Request As HttpRequestMessage, Token As CancellationToken) As System.Threading.Tasks.Task(Of HttpResponseMessage)
+            Dim Response As New HttpResponseMessage(If(Fail, HttpStatusCode.ServiceUnavailable, HttpStatusCode.OK)) With {
+                .Content = New StringContent("<div class='theme-doc-markdown'><a href='https://doc.caumc.cn/file.exe'>PCL-for-CAUMC-99.0.0.exe</a></div>")}
+            Return System.Threading.Tasks.Task.FromResult(Response)
+        End Function
+    End Class
 
     Private Class StartupGuideHandler
         Inherits HttpMessageHandler

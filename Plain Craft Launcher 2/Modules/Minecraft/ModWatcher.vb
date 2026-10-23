@@ -83,6 +83,7 @@ Public Module ModWatcher
 
             '初始化进程与日志读取
             GameProcess = Loader.Input
+            CaumcLauncherUpdate.RememberGame(GameProcess)
             GameProcess.BeginOutputReadLine()
             GameProcess.BeginErrorReadLine()
             AddHandler GameProcess.OutputDataReceived, AddressOf LogReceived

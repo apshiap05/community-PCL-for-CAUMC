@@ -6,6 +6,9 @@ Public Class Application
     '开始
     Private Sub Application_Startup(sender As Object, e As StartupEventArgs) Handles Me.Startup
         Try
+            If e.Args.Length = 2 AndAlso e.Args(0) = "--caumc-update-helper" Then
+                Environment.Exit(PCLCS.CAUMC.LauncherUpdateTransaction.RunHelper(e.Args(1)))
+            End If
             '核心初始化
             MeloongCore.Main.Init(If(e.Args.Contains("--caumc-selftest"), "PCLForCAUMCTest", "PCL"))
             MeloongCore.Wpf.Main.Init()

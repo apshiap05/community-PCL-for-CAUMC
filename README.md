@@ -2,7 +2,7 @@
 
 CAUMC 社区维护的 PCL 第三方修改版，基于龙腾猫跃的 [Plain Craft Launcher](https://github.com/Meloong-Git/PCL)。
 
-[下载最新版](https://github.com/apshiap05/community-PCL-for-CAUMC/releases/latest) · [服务器指南](https://doc.caumc.cn/?post=2) · [皮肤站](https://skin.caumc.cn/)
+[启动器下载](https://doc.caumc.cn/?post=7) · [服务器指南](https://doc.caumc.cn/?post=2) · [皮肤站](https://skin.caumc.cn/)
 
 - 内置 CAU 皮肤站登录，打开即可用。
 - 主服、模组服、皮肤站指南随网站更新，互链直接切换。
@@ -11,6 +11,7 @@ CAUMC 社区维护的 PCL 第三方修改版，基于龙腾猫跃的 [Plain Craf
 - 新包独立安装并保留旧版，批量处理后优先选中网页靠前的成功版本。
 - 统一玻璃界面，22 张社区截图每 5 秒轮播。
 - 统一任务中心，支持保存进度、继续下载、失败重试和后台运行。
+- 启动时检查社区发布页中的新版 EXE，确认下载与重启后更新，失败自动回退。
 - 接入 CurseForge 官方 API，保留镜像与 Modrinth。
 - 默认游戏内存 6 GB，已有手动配置继续生效。
 - 保留游戏下载、整合包导入、Mod、版本管理、设置和诊断。
@@ -22,6 +23,8 @@ Windows 10 / 11，需 .NET Framework 4.8。下载 EXE，放进一个文件夹运
 游戏目录和普通配置兼容原版 PCL。首次打开可导入旧游戏，之后也可从「版本选择」左侧底部进入。导入会复制文件并保留原游戏；账号缓存分别保存。
 
 微软登录等待 Minecraft AppID 审核。
+
+更新文件发布在[启动器页面](https://doc.caumc.cn/?post=7)：上传 EXE，下载链接文字写为 `PCL-for-CAUMC-1.3.0.exe`，版本号与程序一致。可保留历史链接，启动器会选择最高正式版。
 
 ## 构建
 

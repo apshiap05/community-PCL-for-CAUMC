@@ -405,6 +405,7 @@ Public Class FormMain
             Sub()
                 PanBack.RenderTransform = Nothing
                 IsWindowLoadFinished = True
+                CaumcLauncherUpdate.WindowReady()
                 Logger.Info($"DPI：{DPI}，系统版本：{Environment.OSVersion.VersionString}，PCL 位置：{PathExe}")
             End Sub, , True)
         }, "Form Show")
@@ -573,7 +574,11 @@ Public Class FormMain
     ''' </summary>
     ''' <param name="SendWarning">是否在还有下载任务未完成时发出警告。</param>
     Public Sub EndProgram(SendWarning As Boolean)
-        If FrmLinkMain?.TryExit(Not SendWarning, True) Then Return
+        If Not CaumcLauncherUpdate.CanExitForUpdate() Then Return
+        If FrmLinkMain?.TryExit(Not SendWarning, True) Then
+            CaumcLauncherUpdate.CancelInstallExit()
+            Return
+        End If
         '强行结束下载任务？
         If HasDownloadingTask() OrElse CaumcTaskCenter.HasRunning() Then
             If SendWarning Then

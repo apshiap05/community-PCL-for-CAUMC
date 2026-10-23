@@ -13,6 +13,13 @@ Public Class MyMsgText
             MyConverter = Converter
             LabTitle.Text = Converter.Title
             LabCaption.Text = Converter.Text
+            If Converter.LinkText <> "" AndAlso Converter.LinkUrl <> "" Then
+                LabCaption.Inlines.Add(New Documents.LineBreak())
+                LabCaption.Inlines.Add(New Documents.LineBreak())
+                Dim Link As New Documents.Hyperlink(New Documents.Run(Converter.LinkText))
+                AddHandler Link.Click, Sub() OpenWebsite(Converter.LinkUrl)
+                LabCaption.Inlines.Add(Link)
+            End If
             Btn1.Text = Converter.Button1
             If Converter.IsWarn Then
                 Btn1.ColorType = MyButton.ColorState.Red

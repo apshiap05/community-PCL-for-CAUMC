@@ -15,6 +15,7 @@ internal static class Program {
     private static async Task Run(string fixture) {
         await TaskRecoveryTests.Run();
         await CurseForgeAccessTests.Run();
+        await LauncherUpdateTests.Run();
         RunImportChecks();
         RunPackIdentityChecks();
         await RunPackUpdateChecks();

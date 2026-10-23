@@ -1,4 +1,4 @@
-Imports PCLCS.CAUMC
+﻿Imports PCLCS.CAUMC
 Imports System.Text.RegularExpressions
 
 Public Module CaumcTaskCenter
@@ -145,6 +145,7 @@ Public Module CaumcTaskCenter
     Private Function KindText(Value As JObject, Name As String) As String
         Select Case CStr(Value("type"))
             Case "guide-pack" : Return "模组服整合包"
+            Case "launcher-update" : Return "启动器更新"
             Case "local-pack" : Return "整合包导入"
             Case "pcl-import" : Return "旧 PCL 导入"
             Case "install" : Return "游戏安装"
@@ -348,7 +349,7 @@ Public Module CaumcTaskCenter
         End SyncLock
         If Loader Is Nothing Then Return False
         Dim Parts = Leaves(Loader).Where(Function(Part) Part.State = LoadState.Loading).ToList()
-        Return {"files", "guide-pack", "save"}.Contains(CStr(Item.Recipe("type"))) AndAlso
+        Return {"files", "guide-pack", "save", "launcher-update"}.Contains(CStr(Item.Recipe("type"))) AndAlso
             Parts.Count > 0 AndAlso Parts.All(Function(Part) TypeOf Part Is LoaderDownload)
     End Function
     Public Sub StopTask(Id As String, Pause As Boolean)
@@ -470,6 +471,18 @@ Public Module CaumcTaskCenter
         Next
         Using Suppress()
             Select Case CStr(Value("type"))
+                Case "launcher-update"
+                    Dim Archive = CStr(Value("archive"))
+                    If Not PclDataImport.ContainsPath(Paths.Base & "PCL\Updates", Archive) Then Throw New IOException("更新缓存路径无效。")
+                    If File.Exists(Archive) Then
+                        Try
+                            LauncherUpdates.ValidateExecutable(Archive, CStr(Value("version")))
+                        Catch ex As Exception
+                            File.Delete(Archive)
+                            DownloadCheckpoint.Open(CacheFolder, Archive).Delete()
+                        End Try
+                    End If
+                    Loader = CaumcLauncherUpdate.StartDownload(New LauncherRelease With {.Version = CStr(Value("version")), .Url = CStr(Value("url"))}, Archive)
                 Case "guide-pack"
                     Dim Folder = CStr(Value("folder"))
                     If Not Directory.Exists(Folder) Then Throw New DirectoryNotFoundException("原游戏目录已不存在：" & Folder)
@@ -741,6 +754,8 @@ Public Module CaumcTaskCenter
                 Cache.Delete()
             Next
             Dim Archive = CStr(Item.Recipe("archive"))
+            If Item.State = "canceled" AndAlso CStr(Item.Recipe("type")) = "launcher-update" AndAlso
+                Not String.IsNullOrEmpty(Archive) AndAlso PclDataImport.ContainsPath(Paths.Base & "PCL\Updates", Archive) AndAlso File.Exists(Archive) Then File.Delete(Archive)
             If Not String.IsNullOrEmpty(Archive) AndAlso PclDataImport.ContainsPath(DataFolder & "Packages", Archive) AndAlso File.Exists(Archive) Then File.Delete(Archive)
             If CBool(If(Item.Recipe("temporary"), False)) AndAlso Not String.IsNullOrEmpty(Archive) AndAlso
                 Path.GetFileNameWithoutExtension(Archive) = "原始整合包" AndAlso File.Exists(Archive) Then File.Delete(Archive)
@@ -790,7 +805,7 @@ Public Module CaumcTaskCenter
         End If
         FrmMain.Hide()
     End Sub
-    Private Sub RestoreWindow()
+    Public Sub RestoreWindow()
         RunInUi(Sub()
                     FrmMain.Show() : FrmMain.WindowState = WindowState.Normal : FrmMain.Activate()
                     Tray?.Dispose() : Tray = Nothing

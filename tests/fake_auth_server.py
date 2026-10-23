@@ -14,6 +14,13 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.split('?', 1)[0] == '/launcher-update.exe':
+            payload = (Path(sys.argv[1]).parent / 'launcher-update.exe').read_bytes()
+            self.send_response(200)
+            self.send_header('Content-Length', str(len(payload)))
+            self.end_headers()
+            self.wfile.write(payload)
+            return
         if self.path.split('?', 1)[0] == '/task-large.bin':
             total = 4 * 1024 * 1024
             first, last = 0, total - 1

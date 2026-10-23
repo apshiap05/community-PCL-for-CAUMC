@@ -217,6 +217,7 @@
     <Compile Include="Modules\CAUMC\CaumcMigration.vb" />
     <Compile Include="Modules\CAUMC\CaumcPackDownload.vb" />
     <Compile Include="Modules\CAUMC\CaumcTaskCenter.vb" />
+    <Compile Include="Modules\CAUMC\CaumcLauncherUpdate.vb" />
     <Compile Include="Modules\CAUMC\CaumcGlassEffect.vb" />
     <Compile Include="Modules\CAUMC\CaumcPhotoBackdrop.vb" />
     <Compile Include="Modules\CAUMC\CaumcHomepage.vb" />

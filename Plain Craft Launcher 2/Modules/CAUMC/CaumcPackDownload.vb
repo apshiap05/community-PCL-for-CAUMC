@@ -155,19 +155,41 @@ Public Module CaumcPackDownload
         End SyncLock
     End Sub
 
+    Friend Function GuidePackIgnored(Address As Uri) As Boolean
+        SyncLock ImportedLock
+            Return JArray.Parse(Settings.Get(Of String)("CaumcIgnoredGuidePacks")).Values(Of String)().Contains(GuidePackUpdates.Key(Address))
+        End SyncLock
+    End Function
+
+    Friend Sub IgnoreGuidePack(Address As Uri)
+        SyncLock ImportedLock
+            Dim Keys = New HashSet(Of String)(JArray.Parse(Settings.Get(Of String)("CaumcIgnoredGuidePacks")).Values(Of String)(), StringComparer.Ordinal)
+            Keys.Add(GuidePackUpdates.Key(Address))
+            Settings.Set("CaumcIgnoredGuidePacks", New JArray(Keys.OrderBy(Function(Key) Key)).ToString(Newtonsoft.Json.Formatting.None))
+        End SyncLock
+    End Sub
+
     Public Sub CheckGuidePacksAtStartup(OldImport As LoaderCombo(Of String))
         If Interlocked.Exchange(StartupStarted, 1) <> 0 Then Return
         StartupCheck = System.Threading.Tasks.Task.Run(
             Async Function()
                 Try
+                    If OldImport IsNot Nothing Then Await WaitForPackTask(OldImport).ConfigureAwait(False)
+                    Await CaumcLauncherUpdate.CheckAtStartupAsync().ConfigureAwait(False)
                     Using Http As New HttpClient With {.Timeout = TimeSpan.FromSeconds(15)}
                         Await CheckGuidePacksAsync(OldImport, Http,
-                            Function(Update) System.Threading.Tasks.Task.FromResult(MyMsgBox(
+                            Function(Update)
+                                Dim Choice = MyMsgBox(
                                 "检索到 CAUMC Mod 服有新整合包 " & Update.FileName & " 发布，是否自动下载并导入？",
-                                "模组服整合包更新", "是，导入", "否，暂不", ForceWait:=True) = 1)).ConfigureAwait(False)
+                                "模组服整合包更新", "是，下载并导入", "否，暂不导入", "否，本整合包再不提醒", ForceWait:=True)
+                                If Choice = 3 Then IgnoreGuidePack(Update.Address)
+                                Return System.Threading.Tasks.Task.FromResult(Choice = 1)
+                            End Function).ConfigureAwait(False)
                     End Using
                 Catch ex As Exception
                     Logger.Warn(ex, "启动时检查模组服整合包失败，下次启动将重试")
+                Finally
+                    CaumcLauncherUpdate.FinishStartupChecks()
                 End Try
             End Function)
     End Sub
@@ -179,7 +201,7 @@ Public Module CaumcPackDownload
         Dim Guide = GuideCatalog.ForPost(5)
         Dim Service As New ArticleClient(Http, Paths.Base & "PCL\Cache\pack-update-article.json", Guide.Source)
         Dim Snapshot = Await Service.RefreshAsync().ConfigureAwait(False)
-        Await GuidePackUpdates.CheckAsync(Snapshot, Http, Function(Address) GuidePackImported(Address) OrElse CaumcTaskCenter.HasPendingPack(Address), Ask,
+        Await GuidePackUpdates.CheckAsync(Snapshot, Http, Function(Address) GuidePackImported(Address) OrElse GuidePackIgnored(Address) OrElse CaumcTaskCenter.HasPendingPack(Address), Ask,
             AddressOf DownloadUpdateAsync, AddressOf MarkGuidePackImported, selectPreferred:=AddressOf SelectGuidePack).ConfigureAwait(False)
     End Function
 

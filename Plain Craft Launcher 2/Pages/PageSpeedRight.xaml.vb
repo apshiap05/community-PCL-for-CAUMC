@@ -56,6 +56,11 @@ Public Class PageSpeedRight
             If Item.State = "running" OrElse Item.NeedsAttention Then AddAction(Row, "取消", Sub() CaumcTaskCenter.StopTask(Item.Id, False))
             If Item.State = "failed" OrElse CStr(Item.Recipe("type")) = "native" Then AddAction(Row, "诊断与日志", Sub() CaumcTaskCenter.ShowDiagnostics(Item))
             If Item.State = "succeeded" Then AddAction(Row, "导出日志", Sub() CaumcTaskCenter.ExportLog(Item))
+            If Item.State = "succeeded" AndAlso CStr(Item.Recipe("type")) = "launcher-update" AndAlso
+                LauncherUpdates.VersionOf(CStr(Item.Recipe("version"))) > CaumcLauncherUpdate.CurrentVersion AndAlso File.Exists(CStr(Item.Recipe("archive"))) Then
+                AddAction(Row, "安装更新", AddressOf CaumcLauncherUpdate.InstallReady)
+                Row.Message.Text = "新版已下载，等待确认重启安装。"
+            End If
         Next
         EmptyCard.Visibility = If(VisibleCount = 0, Visibility.Visible, Visibility.Collapsed)
         EmptyText.Text = If(Items.Count = 0, "还没有任务", "这里暂时没有任务")

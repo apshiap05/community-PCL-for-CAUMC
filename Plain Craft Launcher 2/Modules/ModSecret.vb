@@ -188,7 +188,7 @@ Friend Module ModSecret
 #Region "更新"
 
     Friend Sub UpdateCheckByButton()
-        MyMsgBox("从 CAUMC 发布渠道取得新版程序，关闭启动器后替换 EXE 即可。保留游戏目录和 PCL 文件夹。", "手动更新说明")
+        CaumcLauncherUpdate.CheckManually()
     End Sub
 
     Friend IsUpdateWaitingRestart As Boolean = False

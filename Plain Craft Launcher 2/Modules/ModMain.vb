@@ -158,6 +158,8 @@ EndHint:
     ''' 存储弹窗信息的转换器。
     ''' </summary>
     Public Class MyMsgBoxConverter
+        Public LinkText As String = ""
+        Public LinkUrl As String = ""
         Public Type As MyMsgBoxType
         Public Title As String
         Public Text As String
@@ -230,9 +232,11 @@ EndHint:
     Public Function MyMsgBox(Caption As String, Optional Title As String = "提示",
                              Optional Button1 As String = "确定", Optional Button2 As String = "", Optional Button3 As String = "",
                              Optional IsWarn As Boolean = False, Optional HighLight As Boolean = True, Optional ForceWait As Boolean = False,
-                             Optional Button1Action As Action = Nothing, Optional Button2Action As Action = Nothing, Optional Button3Action As Action = Nothing) As Integer
+                             Optional Button1Action As Action = Nothing, Optional Button2Action As Action = Nothing, Optional Button3Action As Action = Nothing,
+                             Optional LinkText As String = "", Optional LinkUrl As String = "") As Integer
         '将弹窗列入队列
         Dim Converter As New MyMsgBoxConverter With {.Type = MyMsgBoxType.Text, .Button1 = Button1, .Button2 = Button2, .Button3 = Button3, .Text = Caption, .IsWarn = IsWarn, .Title = Title, .HighLight = HighLight, .ForceWait = True, .Button1Action = Button1Action, .Button2Action = Button2Action, .Button3Action = Button3Action}
+        Converter.LinkText = LinkText : Converter.LinkUrl = LinkUrl
         If Button2.Length > 0 OrElse ForceWait Then
             '若有多个按钮则开始等待
             If FrmMain Is Nothing OrElse FrmMain.PanMsg Is Nothing AndAlso RunInUi() Then

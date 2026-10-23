@@ -1,4 +1,4 @@
-param([string]$ExePath, [string]$ScratchRoot, [switch]$WithNetworkChecks, [string]$ModpackPath, [switch]$LaunchOffline, [string]$RegressionInstancePath, [switch]$WithGuideImageChecks, [string]$FabricRequestPath, [string]$SeedGameCachePath, [string]$ModUpdateFixturePath, [AllowEmptyString()][string]$ExpectedMicrosoftClientId, [switch]$WithLayoutChecks, [switch]$WithCurseForgeChecks)
+﻿param([string]$ExePath, [string]$ScratchRoot, [switch]$WithNetworkChecks, [string]$ModpackPath, [switch]$LaunchOffline, [string]$RegressionInstancePath, [switch]$WithGuideImageChecks, [string]$FabricRequestPath, [string]$SeedGameCachePath, [string]$ModUpdateFixturePath, [AllowEmptyString()][string]$ExpectedMicrosoftClientId, [switch]$WithLayoutChecks, [switch]$WithCurseForgeChecks, [switch]$WithLauncherUpdateChecks)
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path $PSScriptRoot
 if (-not $ExePath) { $ExePath = Join-Path $sourceRoot 'dist/PCL for CAUMC.exe' }
@@ -7,6 +7,11 @@ $testRoot = Join-Path ([IO.Path]::GetFullPath($ScratchRoot)) ([Guid]::NewGuid().
 New-Item -ItemType Directory -Force $testRoot | Out-Null
 $testExe = Join-Path $testRoot 'PCL for CAUMC.exe'
 Copy-Item -LiteralPath $ExePath -Destination $testExe
+if ($WithLauncherUpdateChecks) {
+    $compiler = Join-Path $env:WINDIR 'Microsoft.NET/Framework64/v4.0.30319/csc.exe'
+    & $compiler /nologo /target:winexe /define:NEW_VERSION ("/out:" + (Join-Path $testRoot 'launcher-update.exe')) (Join-Path $sourceRoot 'tests/fixtures/UpdateTarget.cs')
+    if ($LASTEXITCODE) { throw '更新下载样例编译失败' }
+}
 if ($WithCurseForgeChecks) { New-Item -ItemType File -Path (Join-Path $testRoot 'curseforge-live-tests') | Out-Null }
 if ($WithLayoutChecks) {
     New-Item -ItemType File -Path (Join-Path $testRoot 'layout-tests') | Out-Null
