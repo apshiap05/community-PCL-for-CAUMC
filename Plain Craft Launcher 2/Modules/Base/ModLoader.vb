@@ -14,6 +14,9 @@ Public Module ModLoader
         ''' 加载器的标识编号。
         ''' </summary>
         Public Uuid As Integer = GetUuid()
+        Public RecoveryId As String
+        Public RecoveryRecipe As JObject
+        Public RecoverySilent As Boolean
         ''' <summary>
         ''' 加载器的名称。
         ''' </summary>
@@ -676,6 +679,7 @@ Restart:
     Public Sub LoaderTaskbarAdd(Of T)(Loader As LoaderCombo(Of T))
         If FrmSpeedLeft IsNot Nothing Then FrmSpeedLeft.TaskRemove(Loader)
         LoaderTaskbar.Add(Loader)
+        CaumcTaskCenter.Track(Loader)
         Logger.Info($"{Loader.Name} 已加入任务列表")
     End Sub
     Public Sub LoaderTaskbarProgressRefresh()

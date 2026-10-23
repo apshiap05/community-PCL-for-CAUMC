@@ -349,7 +349,13 @@ GroupDone:
                 File.ToNetFile(Target, ResourceVersion.DownloadReason.Standalone, File.GameVersions.FirstOrDefault, File.ModLoaders)
             }) With {.ProgressWeight = 10, .Block = True})
             Loaders.Add(New LoaderTask(Of Integer, Integer)("准备安装整合包",
-            Sub() ModpackInstall(Target, InstanceName, If(FileUtils.Exists(LogoFileAddress), LogoFileAddress, Nothing))) With {.ProgressWeight = 0.1})
+            Sub(Task)
+                Dim Installation As LoaderCombo(Of String)
+                Using CaumcTaskCenter.Suppress(Task.RealParent)
+                    Installation = ModpackInstall(Target, InstanceName, If(FileUtils.Exists(LogoFileAddress), LogoFileAddress, Nothing))
+                End Using
+                CaumcTaskCenter.WaitForInstallation(Task, Installation)
+            End Sub) With {.ProgressWeight = 8})
 
             '启动
             Dim Loader As New LoaderCombo(Of String)(LoaderName, Loaders) With {.OnStateChanged =
@@ -364,6 +370,7 @@ GroupDone:
                 End Select
                 McInstallFailedClearFolder(MyLoader)
             End Sub}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "resource-pack"}, {"archive", Target}, {"folder", McFolderSelected}, {"sourceName", File.FileName}, {"temporary", True}})
             Loader.Start(McFolderSelected & "versions\" & InstanceName & "\")
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()

@@ -1188,8 +1188,7 @@ Public Module ModDownload
 
     Friend Function DlModRequestSources(Url As String) As List(Of (Url As String, Timeout As Integer))
         Dim Urls As New List(Of (Url As String, Timeout As Integer))
-        If CaumcIsCurseForgeApi(New Uri(Url, UriKind.Absolute)) Then
-            ' Keep the upstream mirror path, with no official API fallback or project key.
+        If CaumcIsCurseForgeApi(New Uri(Url, UriKind.Absolute)) AndAlso Not CaumcHasCurseForgeKey() Then
             Dim Mirror As New UriBuilder(Url) With {.Scheme = Uri.UriSchemeHttps, .Host = "mod.mcimirror.top", .Port = -1, .UserName = "", .Password = ""}
             Mirror.Path = "/curseforge" & Mirror.Path
             Urls.Add((Mirror.Uri.AbsoluteUri, 10))

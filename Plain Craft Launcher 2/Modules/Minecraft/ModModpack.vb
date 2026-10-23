@@ -30,6 +30,7 @@ Public Module ModModpack
     ''' </summary>
     Public Function ModpackInstall(File As String, Optional InstanceName As String = Nothing, Optional Logo As String = Nothing, Optional Automatic As Boolean = False, Optional PreferredVersion As String = Nothing) As LoaderCombo(Of String)
         Logger.Info($"整合包安装请求：{If(File, "null")}")
+        Dim OriginalFolder = McFolderSelected
         Dim Archive As ZipArchive = Nothing
         Dim ArchiveBaseFolder As String = ""
         Try
@@ -101,25 +102,25 @@ Public Module ModModpack
             Select Case PackType
                 Case 0
                     Logger.Info("整合包种类：CurseForge")
-                    Return InstallPackCurseForge(File, Archive, ArchiveBaseFolder, InstanceName, Logo)
+                    Return CaumcTaskCenter.LocalPack(InstallPackCurseForge(File, Archive, ArchiveBaseFolder, InstanceName, Logo), File, OriginalFolder)
                 Case 1
                     Logger.Info("整合包种类：HMCL")
-                    Return InstallPackHMCL(File, Archive, ArchiveBaseFolder)
+                    Return CaumcTaskCenter.LocalPack(InstallPackHMCL(File, Archive, ArchiveBaseFolder), File, OriginalFolder)
                 Case 2
                     Logger.Info("整合包种类：MMC")
-                    Return InstallPackMMC(File, Archive, ArchiveBaseFolder)
+                    Return CaumcTaskCenter.LocalPack(InstallPackMMC(File, Archive, ArchiveBaseFolder), File, OriginalFolder)
                 Case 3
                     Logger.Info("整合包种类：MCBBS")
-                    Return InstallPackMCBBS(File, Archive, ArchiveBaseFolder, InstanceName)
+                    Return CaumcTaskCenter.LocalPack(InstallPackMCBBS(File, Archive, ArchiveBaseFolder, InstanceName), File, OriginalFolder)
                 Case 4
                     Logger.Info("整合包种类：Modrinth")
-                    Return InstallPackModrinth(File, Archive, ArchiveBaseFolder, InstanceName, Logo)
+                    Return CaumcTaskCenter.LocalPack(InstallPackModrinth(File, Archive, ArchiveBaseFolder, InstanceName, Logo), File, OriginalFolder)
                 Case 9
                     Logger.Info("整合包种类：带启动器的压缩包")
-                    Return InstallPackLauncherPack(File, Archive, ArchiveBaseFolder, InstanceName, Logo, Automatic)
+                    Return CaumcTaskCenter.LocalPack(InstallPackLauncherPack(File, Archive, ArchiveBaseFolder, InstanceName, Logo, Automatic), File, OriginalFolder)
                 Case Else
                     Logger.Info("整合包种类：未能识别，假定为压缩包")
-                    Return InstallPackCompress(File, Archive, Automatic, PreferredVersion)
+                    Return CaumcTaskCenter.LocalPack(InstallPackCompress(File, Archive, Automatic, PreferredVersion), File, OriginalFolder)
             End Select
         Finally
             If Archive IsNot Nothing Then Archive.Dispose()
@@ -308,7 +309,7 @@ Public Module ModModpack
                     End If
                     '建立 CompFile
                     Dim File = ResourceVersion.FromPlatformJson(ModJson, Type)
-                    If Not File.DownloadAvailable Then Continue For
+                    If Not File.DownloadAvailable Then Throw New IOException("CurseForge 未为此文件提供第三方下载，请到资源网页下载后再安装：" & File.FileName)
                     '实际的添加
                     FileList.Add(Id, File.ToNetFile(PathUtils.AddSlashSuffix(Path.Combine(VersionFolder, TargetFolder)),
                         ResourceVersion.DownloadReason.ModPack, TargetVersion.VanillaName, TargetVersion.ModLoaders))

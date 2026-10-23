@@ -430,6 +430,7 @@ Public Class FormMain
                 End Select
             End If
             Dim OldImport = CaumcOfferPclImport()
+            CaumcTaskCenter.NotifyPending()
             CheckGuidePacksAtStartup(OldImport)
             '启动加载器池
             Try
@@ -572,9 +573,17 @@ Public Class FormMain
     ''' </summary>
     ''' <param name="SendWarning">是否在还有下载任务未完成时发出警告。</param>
     Public Sub EndProgram(SendWarning As Boolean)
+        If FrmLinkMain?.TryExit(Not SendWarning, True) Then Return
         '强行结束下载任务？
-        If HasDownloadingTask() Then
-            If SendWarning AndAlso MyMsgBox("还有下载任务尚未完成，是否确定退出？", "提示", "确定", "取消") = 2 Then Return
+        If HasDownloadingTask() OrElse CaumcTaskCenter.HasRunning() Then
+            If SendWarning Then
+                Dim Choice = MyMsgBox("还有任务正在进行。退出后可在任务中心继续，也可以留在后台完成。", "任务尚未完成", "退出并保存进度", "留在后台继续", "取消")
+                If Choice <> 1 Then
+                    If Choice = 2 Then CaumcTaskCenter.KeepInBackground()
+                    Return
+                End If
+            End If
+            CaumcTaskCenter.PreserveBeforeExit()
             RunInNewThread(
             Sub()
                 Logger.Info("正在强行停止任务")
@@ -583,8 +592,8 @@ Public Class FormMain
                 Next
             End Sub, "强行停止下载任务")
         End If
+        CaumcTaskCenter.PreserveBeforeExit()
         '关闭联机？
-        If FrmLinkMain?.TryExit(Not SendWarning, True) Then Return
         '关闭
         RunInUiWait(
         Sub()
@@ -1260,8 +1269,6 @@ Public Class FormMain
         Select Case Stack.Page
             Case PageType.InstanceSelect
                 Return "版本选择"
-            Case PageType.TaskManager
-                Return "任务管理"
             Case PageType.InstanceSetup
                 Return "版本设置 - " & If(PageInstanceLeft.Instance Is Nothing, "未知版本", PageInstanceLeft.Instance.Name)
             Case PageType.ResourceDetail
@@ -1368,7 +1375,7 @@ Public Class FormMain
             '切换到主页面
             PageChangeExit()
             IsChangingPage = True '防止下面的勾选直接触发了 PageChangeActual
-            CType(PanTitleSelect.Children(Stack), MyRadioButton).SetChecked(True, True, PageNameGet(PageCurrent) = "")
+            PanTitleSelect.Children.OfType(Of MyRadioButton)().First(Function(Button) CInt(Val(Button.Tag)) = CInt(Stack.Page)).SetChecked(True, True, PageNameGet(PageCurrent) = "")
             IsChangingPage = False
             Select Case Stack.Page
                 Case PageType.Download
@@ -1395,7 +1402,7 @@ Public Class FormMain
     ''' <summary>
     ''' 通过点击导航栏改变页面。
     ''' </summary>
-    Private Sub BtnTitleSelect_Click(sender As MyRadioButton, raiseByMouse As Boolean) Handles BtnTitleSelect0.Check, BtnTitleSelect1.Check, BtnTitleSelect2.Check, BtnTitleSelect3.Check, BtnTitleSelect4.Check
+    Private Sub BtnTitleSelect_Click(sender As MyRadioButton, raiseByMouse As Boolean) Handles BtnTitleSelect0.Check, BtnTitleSelect1.Check, BtnTitleSelect2.Check, BtnTitleSelect3.Check, BtnTitleSelect4.Check, BtnTitleTasks.Check
         If IsChangingPage Then Return
         PageChangeActual(Val(sender.Tag))
     End Sub
@@ -1666,7 +1673,7 @@ Public Class FormMain
         PageChange(PageType.TaskManager)
     End Sub
     Private Function BtnExtraDownload_ShowCheck() As Boolean
-        Return HasDownloadingTask() AndAlso Not PageCurrent = PageType.TaskManager
+        Return CaumcTaskCenter.HasRunning() AndAlso Not PageCurrent = PageType.TaskManager
     End Function
 
     '投降

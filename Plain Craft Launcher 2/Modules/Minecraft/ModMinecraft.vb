@@ -778,6 +778,8 @@ ExitDataLoad:
                     .ContentHandler = ContentHandler
                 }
                 '标题
+                Dim CommunityInfo = CaumcPackDownload.VersionTaskInfo(PathVersion)
+                If CommunityInfo <> "" Then NewItem.Info &= " · " & CommunityInfo
                 NewItem.Inlines.Clear()
                 NewItem.Inlines.Add(New Run(Name))
                 If ReadIni(PathVersion & "PCL\Setup.ini", "CustomInfo") <> "" Then '如果版本设置了自定义描述，在标题后面以淡灰色显示其版本号

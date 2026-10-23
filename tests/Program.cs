@@ -13,6 +13,8 @@ internal static class Program {
         response.Headers.ETag = new(etag); return response;
     }
     private static async Task Run(string fixture) {
+        await TaskRecoveryTests.Run();
+        await CurseForgeAccessTests.Run();
         RunImportChecks();
         RunPackIdentityChecks();
         await RunPackUpdateChecks();

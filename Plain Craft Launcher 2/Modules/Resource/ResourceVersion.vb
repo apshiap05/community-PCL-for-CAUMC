@@ -131,11 +131,12 @@ Public Class ResourceVersion
                 .Hash = CType(Data("hashes"), JArray).ToList.FirstOrDefault(Function(s) s("algo").ToObject(Of Integer) = 1)?("value")?.ToString().Lower()
                 If .Hash Is Nothing Then .Hash = CType(Data("hashes"), JArray).ToList.FirstOrDefault(Function(s) s("algo").ToObject(Of Integer) = 2)?("value")?.ToString().Lower()
                 'DownloadAddress
-                Dim Url = Data("downloadUrl").ToString
-                If Url = "" Then Url = $"https://edge.forgecdn.net/files/{CInt(.Id.ToString.Substring(0, 4))}/{CInt(.Id.ToString.Substring(4))}/{ .FileName}"
-                .DownloadUrls = ParseCurseForgeDownloadUrls(Url.Replace(.FileName, StringUtils.UrlEscape(.FileName))) '对脑残 CurseForge 的下载地址进行多种修正
-                .DownloadUrls.Add(DlSourceModGet(Url)) '添加镜像源；注意 MCIM 源不支持 URL 编码后的文件名，必须传入 URL 编码前的文件名
-                .DownloadUrls = .DownloadUrls.Distinct.ToList '最终去重
+                Dim Url = CStr(Data("downloadUrl"))
+                If Not String.IsNullOrWhiteSpace(Url) Then
+                    .DownloadUrls = ParseCurseForgeDownloadUrls(Url.Replace(.FileName, StringUtils.UrlEscape(.FileName)))
+                    .DownloadUrls.Add(DlSourceModGet(Url))
+                    .DownloadUrls = .DownloadUrls.Distinct.ToList
+                End If
                 'Dependencies
                 If Data.ContainsKey("dependencies") Then
                     .RawDependencies = Data("dependencies").

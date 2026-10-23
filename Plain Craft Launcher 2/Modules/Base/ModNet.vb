@@ -256,7 +256,7 @@ Retry:
                 CancelToken?.Dispose() : CancelToken = New CancellationTokenSource(Timeout)
                 Dim ClonedRequest As HttpRequestMessage = Request.Clone() 'HttpRequestMessage 只能发送一次，重试时需要克隆一个新的
                 Try
-                    Response = RequestClient.SendAsync(ClonedRequest, HttpCompletionOption.ResponseHeadersRead, CancelToken.Token).GetResultWithTimeout(CancelToken, Timeout)
+                    Response = CaumcSendAsync(RequestClient, ClonedRequest, CancelToken.Token).GetResultWithTimeout(CancelToken, Timeout)
                 Finally
                     ClonedRequest.Dispose()
                 End Try
@@ -689,6 +689,7 @@ Retry:
         ''' 文件的校验规则。
         ''' </summary>
         Public Check As FileChecker
+        Private RecoveryCache As PCLCS.CAUMC.DownloadCheckpoint
         ''' <summary>
         ''' 是否模拟浏览器的 UserAgent 和 Referer。
         ''' </summary>
@@ -916,7 +917,7 @@ StartThread:
                 CancelToken = New CancellationTokenSource(Timeout)
                 If Not Th.IsFirstThread Then HttpRequest.Headers.Range = New Headers.RangeHeaderValue(Th.DownloadStart, Nothing)
                 Dim ContentLength As Long = 0
-                Response = ThreadClient.SendAsync(HttpRequest, HttpCompletionOption.ResponseHeadersRead, CancelToken.Token).GetResultWithTimeout(CancelToken, Timeout)
+                Response = CaumcSendAsync(ThreadClient, HttpRequest, CancelToken.Token).GetResultWithTimeout(CancelToken, Timeout)
                 If Not Response.IsSuccessStatusCode Then '状态码检查
                     Throw New HttpRequestCodeException($"错误码 {Response.StatusCode} ({CInt(Response.StatusCode)})，{Th.Source.Url}", Response.StatusCode, Nothing)
                 End If
@@ -976,6 +977,7 @@ NotSupportRange:
                     If State < NetState.Reading Then State = NetState.Reading
                 End SyncLock
                 '创建缓存文件
+                If RecoveryCache Is Nothing Then RecoveryCache = CaumcTaskCenter.Capture(Me, Response)
                 If IsNoSplit Then
                     Th.Temp = Nothing
                     Cache = New MemoryStream
@@ -1017,6 +1019,14 @@ NotSupportRange:
                         Next
                         Interlocked.Add(NetManager.DownloadDone, RealDataCount)
                         Interlocked.Add(DownloadDone, RealDataCount)
+                        If RecoveryCache IsNot Nothing Then
+                            Try
+                                RecoveryCache.Write(Th.DownloadStart + Th.DownloadDone, ResponseBytes, RealDataCount)
+                            Catch CacheError As IOException
+                                Logger.Warn(CacheError, "写入下载恢复缓存失败")
+                                RecoveryCache = Nothing
+                            End Try
+                        End If
                         Th.DownloadDone += RealDataCount
                         ResultStream.Write(ResponseBytes, 0, RealDataCount)
                         '已完成
@@ -1293,6 +1303,7 @@ Retry:
             End SyncLock
             Interlocked.Decrement(NetManager.FileRemain)
             If PrintLog Then Logger.Info($"{LocalName}：已完成")
+            CaumcTaskCenter.DownloadFinished(Me)
             For Each Task In Tasks
                 Task.OnFileFinish(Me)
             Next
@@ -1424,6 +1435,7 @@ FinishExCatch:
                         If Not File.LocalPath.Contains(":\") Then Throw New ArgumentException("输入的本地文件地址不正确：" & File.LocalPath)
                         If File.LocalPath.EndsWithF("\") Then Throw New ArgumentException("请输入含文件名的完整文件路径：" & File.LocalPath)
                         DirectoryUtils.Create(PathUtils.RemoveLastPart(File.LocalPath)) '创建目标文件夹
+                        CaumcTaskCenter.ReuseDownload(File)
                     Next
                     '接入下载管理器，获取新开始下载的文件列表
                     Dim NewFiles = NetManager.Start(Me)

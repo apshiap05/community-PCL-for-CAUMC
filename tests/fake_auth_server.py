@@ -14,6 +14,29 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
     def do_GET(self):
+        if self.path.split('?', 1)[0] == '/task-large.bin':
+            total = 4 * 1024 * 1024
+            first, last = 0, total - 1
+            byte_range = self.headers.get('Range', '')
+            if byte_range.startswith('bytes='):
+                values = byte_range[6:].split('-', 1)
+                first = int(values[0])
+                last = int(values[1]) if values[1] else last
+            self.send_response(206 if byte_range else 200)
+            self.send_header('Content-Length', str(last - first + 1))
+            self.send_header('ETag', '"task-fixture-v1"')
+            self.send_header('Accept-Ranges', 'bytes')
+            if byte_range:
+                self.send_header('Content-Range', f'bytes {first}-{last}/{total}')
+            self.end_headers()
+            try:
+                for offset in range(first, last + 1, 16384):
+                    self.wfile.write(b'Q' * min(16384, last - offset + 1))
+                    self.wfile.flush()
+                    time.sleep(0.003)
+            except (BrokenPipeError, ConnectionResetError, ConnectionAbortedError):
+                pass
+            return
         if self.path.split('?', 1)[0] == "/pack.zip":
             archive = io.BytesIO()
             with zipfile.ZipFile(archive, 'w', zipfile.ZIP_DEFLATED) as pack:

@@ -61,20 +61,39 @@ Public Module CaumcMigration
                 If PclDataImport.ContainsPath(Paths.Base, Folder) Then Continue For
                 If Not Sources.Any(Function(Item) PathUtils.IsSame(Item, Folder)) Then Sources.Add(Folder)
             Next
-            Dim Loader As New LoaderCombo(Of String)("导入旧 PCL 游戏", {
+            Return CaumcImportSources(Sources)
+        Catch ex As Exception
+            Logger.Error(ex, "导入旧 PCL 游戏失败", LogBehavior.Alert)
+        End Try
+        Return Nothing
+    End Function
+
+    Public Function CaumcImportSources(Sources As List(Of String), Optional Recovery As JObject = Nothing) As LoaderCombo(Of String)
+            Dim Value = If(Recovery, New JObject From {{"type", "pcl-import"}, {"sources", New JArray(Sources)}, {"completed", New JObject()}, {"keys", New JObject()}})
+            If Value("completed") Is Nothing Then Value("completed") = New JObject()
+            If Value("keys") Is Nothing Then Value("keys") = New JObject()
+            For Each Source In Sources
+                If Value("keys")(Source) Is Nothing Then Value("keys")(Source) = Guid.NewGuid().ToString("N")
+            Next
+            Dim Loader As LoaderCombo(Of String) = Nothing
+            Loader = New LoaderCombo(Of String)("导入旧 PCL 游戏", {
                 New LoaderTask(Of String, Integer)("复制游戏、模组和存档",
                     Sub(Task As LoaderTask(Of String, Integer))
                         Dim Index = 0
                         For Each Source In Sources
                             Task.CreateCancellationToken().ThrowIfCancellationRequested()
                             Dim Destination As String
-                            If PclDataImport.ContainsPath(Paths.Base, Source) Then
+                            If Value("completed")(Source) IsNot Nothing AndAlso Directory.Exists(CStr(Value("completed")(Source))) Then
+                                Destination = CStr(Value("completed")(Source))
+                            ElseIf PclDataImport.ContainsPath(Paths.Base, Source) Then
                                 Destination = PathUtils.AddSlashSuffix(Source)
                             Else
                                 Dim Progress As New ImportProgress(Task, Index, Sources.Count)
-                                Destination = PclDataImport.CopyGame(Source, Paths.Base & "ImportedGames", Task.CreateCancellationToken(), Progress)
+                                Destination = PclDataImport.CopyGame(Source, Paths.Base & "ImportedGames", Task.CreateCancellationToken(), Progress, CStr(Value("keys")(Source)))
                             End If
                             CaumcRegisterGameFolder(Destination, New DirectoryInfo(Source).Parent.Name)
+                            Value("completed")(Source) = Destination
+                            CaumcTaskCenter.Recipe(Loader, Value)
                             If Index = 0 Then McFolderSelected = Destination
                             Index += 1
                             Task.Progress = Index / Sources.Count
@@ -86,19 +105,17 @@ Public Module CaumcMigration
                                 End Sub)
                     End Sub)
             }) With {.OnStateChanged = AddressOf CaumcTaskState}
-            Loader.Start(Selected)
+            CaumcTaskCenter.Recipe(Loader, Value)
+            Loader.Start()
             LoaderTaskbarAdd(Loader)
             RunInUi(Sub() FrmMain.BtnExtraDownload.ShowRefresh())
             Return Loader
-        Catch ex As Exception
-            Logger.Error(ex, "导入旧 PCL 游戏失败", LogBehavior.Alert)
-        End Try
-        Return Nothing
     End Function
 
     Public Sub CaumcTaskState(Loader As LoaderBase)
         Select Case Loader.State
             Case LoadState.Failed
+                If CaumcTaskCenter.IsTracked(Loader) Then Return
                 Logger.Error(Loader.Error, Loader.Name & "失败", LogBehavior.Alert)
             Case LoadState.Canceled
                 Hint(Loader.Name & "已取消", HintType.Blue)

@@ -1,4 +1,4 @@
-param([string]$ExePath, [string]$ScratchRoot, [switch]$WithNetworkChecks, [string]$ModpackPath, [switch]$LaunchOffline, [string]$RegressionInstancePath, [switch]$WithGuideImageChecks, [string]$FabricRequestPath, [string]$SeedGameCachePath, [string]$ModUpdateFixturePath, [AllowEmptyString()][string]$ExpectedMicrosoftClientId, [switch]$WithLayoutChecks)
+param([string]$ExePath, [string]$ScratchRoot, [switch]$WithNetworkChecks, [string]$ModpackPath, [switch]$LaunchOffline, [string]$RegressionInstancePath, [switch]$WithGuideImageChecks, [string]$FabricRequestPath, [string]$SeedGameCachePath, [string]$ModUpdateFixturePath, [AllowEmptyString()][string]$ExpectedMicrosoftClientId, [switch]$WithLayoutChecks, [switch]$WithCurseForgeChecks)
 $ErrorActionPreference = 'Stop'
 $sourceRoot = Split-Path $PSScriptRoot
 if (-not $ExePath) { $ExePath = Join-Path $sourceRoot 'dist/PCL for CAUMC.exe' }
@@ -7,6 +7,7 @@ $testRoot = Join-Path ([IO.Path]::GetFullPath($ScratchRoot)) ([Guid]::NewGuid().
 New-Item -ItemType Directory -Force $testRoot | Out-Null
 $testExe = Join-Path $testRoot 'PCL for CAUMC.exe'
 Copy-Item -LiteralPath $ExePath -Destination $testExe
+if ($WithCurseForgeChecks) { New-Item -ItemType File -Path (Join-Path $testRoot 'curseforge-live-tests') | Out-Null }
 if ($WithLayoutChecks) {
     New-Item -ItemType File -Path (Join-Path $testRoot 'layout-tests') | Out-Null
     $expectedPhotos = @(Get-ChildItem -LiteralPath (Join-Path $sourceRoot 'Plain Craft Launcher 2/Resources/Backgrounds') -Filter '*.jpg' | Sort-Object Name | ForEach-Object {
@@ -79,11 +80,17 @@ try {
     for ($attempt = 0; $attempt -lt 50 -and -not (Test-Path -LiteralPath $urlFile); $attempt++) { Start-Sleep -Milliseconds 100 }
     if (-not (Test-Path -LiteralPath $urlFile)) { throw '本地认证模拟服务未就绪' }
     $process = Start-Process -FilePath $testExe -ArgumentList '--caumc-selftest' -WindowStyle Hidden -PassThru
-    $timeout = if ($LaunchOffline -or $FabricRequestPath) { 2000000 } elseif ($ModpackPath) { 1250000 } elseif ($ModUpdateFixturePath) { 600000 } elseif ($RegressionInstancePath -or $WithGuideImageChecks -or $WithLayoutChecks) { 120000 } else { 30000 }
+    $timeout = if ($LaunchOffline -or $FabricRequestPath) { 2000000 } elseif ($ModpackPath) { 1250000 } elseif ($ModUpdateFixturePath) { 600000 } elseif ($RegressionInstancePath -or $WithGuideImageChecks -or $WithLayoutChecks -or $WithCurseForgeChecks) { 120000 } else { 30000 }
     Write-Output "自检进程：PID=$($process.Id)，目录=$testRoot"
     if (-not $process.WaitForExit($timeout)) { throw "自检超时，PID=$($process.Id)" }
     Get-Content -LiteralPath (Join-Path $testRoot 'selftest-result.txt') -Encoding UTF8
     if ($process.ExitCode -ne 0) { throw "自检失败，退出码=$($process.ExitCode)" }
+    if (Test-Path -LiteralPath (Join-Path $testRoot 'task-process-probe.json')) {
+        $process = Start-Process -FilePath $testExe -ArgumentList @('--caumc-selftest', '--caumc-task-probe') -WindowStyle Hidden -PassThru
+        if (-not $process.WaitForExit(60000)) { throw '跨进程任务恢复自检超时' }
+        if ($process.ExitCode -ne 0) { Get-Content -LiteralPath (Join-Path $testRoot 'selftest-result.txt') -Tail 12; throw '跨进程任务恢复自检失败' }
+        Get-Content -LiteralPath (Join-Path $testRoot 'task-process-result.txt') -Encoding UTF8
+    }
     foreach ($sourceFile in $regressionSourceHashes.Keys) {
         if ((Get-FileHash -LiteralPath $sourceFile -Algorithm SHA256).Hash -ne $regressionSourceHashes[$sourceFile]) {
             throw "回归输入源文件发生变化：$sourceFile"

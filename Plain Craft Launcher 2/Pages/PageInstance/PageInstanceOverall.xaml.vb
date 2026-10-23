@@ -254,6 +254,7 @@ Public Class PageInstanceOverall
             Next
             '启动
             Dim Loader As New LoaderCombo(Of String)(PageInstanceLeft.Instance.Name & " 文件补全", DlClientFix(PageInstanceLeft.Instance, True, False))
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "repair"}, {"version", PageInstanceLeft.Instance.PathVersion}})
             Loader.OnStateChanged =
             Sub()
                 Select Case Loader.State

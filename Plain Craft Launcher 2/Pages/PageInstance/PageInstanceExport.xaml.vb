@@ -1,4 +1,4 @@
-Public Class ExportOption
+﻿Public Class ExportOption
     Public Property Title As String
     Public Property Description As String
     Public Property Rules As String
@@ -470,6 +470,25 @@ Public Class PageInstanceExport
         Dim AllExtraFiles = StandardizeLines(GetExtraFileLines(), False).ToList()
         Logger.Info($"准备导出整合包，共有 {AllRules.Count} 条规则，{AllExtraFiles.Count} 条追加内容行")
 
+        Dim Request As New JObject From {{"name", PackName}, {"packVersion", PackVersion}, {"path", PackPath},
+            {"instance", TargetInstance.PathVersion}, {"indie", PathIndie}, {"java", IncludeJava},
+            {"hosted", CheckHostedAssets}, {"modrinth", ModrinthUploadMode}, {"pcl", IncludePCL}, {"custom", IncludePCLCustom},
+            {"rules", New JArray(AllRules)}, {"extra", New JArray(AllExtraFiles)}}
+        StartExportTask(Request)
+        FrmMain.PageChange(FormMain.PageType.TaskManager)
+    End Sub
+
+    Public Shared Function StartExportTask(Request As JObject) As LoaderCombo(Of String)
+        Dim PackName = CStr(Request("name")), PackVersion = CStr(Request("packVersion")), PackPath = CStr(Request("path"))
+        Dim LoaderName = "导出整合包：" & PackName
+        Dim TargetInstance As New McInstance(CStr(Request("instance")))
+        Dim PathIndie = CStr(Request("indie"))
+        If Not Directory.Exists(PathIndie) Then Throw New DirectoryNotFoundException(PathIndie)
+        Dim IncludeJava = CBool(Request("java")), CheckHostedAssets = CBool(Request("hosted")), ModrinthUploadMode = CBool(Request("modrinth"))
+        Dim IncludePCL = CBool(Request("pcl")), IncludePCLCustom = CBool(Request("custom"))
+        Dim AllRules = Request("rules").ToObject(Of List(Of String))(), AllExtraFiles = Request("extra").ToObject(Of List(Of String))()
+        Dim CacheFolder = RequestTaskTempFolder()
+        Dim OverridesFolder = CacheFolder & "modpack\overrides\"
         '构造步骤加载器
         Dim Loaders As New List(Of LoaderBase)
 
@@ -722,12 +741,13 @@ Public Class PageInstanceExport
 
         '启动
         Dim MainLoader As New LoaderCombo(Of String)(LoaderName, Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+        CaumcTaskCenter.Recipe(MainLoader, New JObject From {{"type", "export"}, {"request", Request}, {"version", TargetInstance.PathVersion}})
         MainLoader.Start()
         LoaderTaskbarAdd(MainLoader)
         FrmMain.BtnExtraDownload.ShowRefresh()
         FrmMain.BtnExtraDownload.Ribble()
-        FrmMain.PageChange(FormMain.PageType.TaskManager)
-    End Sub
+        Return MainLoader
+    End Function
 
 #End Region
 

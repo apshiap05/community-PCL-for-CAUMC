@@ -1,4 +1,4 @@
-Public Module ModDownloadLib
+﻿Public Module ModDownloadLib
 
 #Region "Minecraft 下载"
 
@@ -136,6 +136,9 @@ Public Module ModDownloadLib
         McUpdateLogShow(Version)
     End Sub
     Private Sub McDownloadMenuSaveServer(sender As Object, e As RoutedEventArgs)
+        McDownloadMenuSaveServerCore(sender, e)
+    End Sub
+    Public Sub McDownloadMenuSaveServerCore(sender As Object, e As RoutedEventArgs, Optional ResumeTarget As String = Nothing)
         Dim Version As MyListItem
         If TypeOf sender Is MyListItem Then
             Version = sender
@@ -147,7 +150,7 @@ Public Module ModDownloadLib
         Try
             Dim Id = Version.Title
             Dim JsonUrl = Version.Tag("url").ToString
-            Dim VersionFolder As String = Dialogs.SelectFolder("选择目标文件夹", False).FirstOrDefault
+            Dim VersionFolder As String = If(ResumeTarget, Dialogs.SelectFolder("选择目标文件夹", False).FirstOrDefault)
             If VersionFolder Is Nothing Then Return
             VersionFolder = VersionFolder & Id & "\"
 
@@ -203,6 +206,7 @@ pause"
 
             '启动
             Dim Loader As New LoaderCombo(Of String)("Minecraft " & Id & " 服务端下载", Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "mc-server"}, {"info", New JObject From {{"id", Id}, {"url", JsonUrl}}}, {"target", Path.GetDirectoryName(VersionFolder.TrimEnd("\"c)) & "\"}})
             Loader.Start(Id)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -212,6 +216,9 @@ pause"
         End Try
     End Sub
     Public Sub McDownloadMenuSave(sender As Object, e As RoutedEventArgs)
+        McDownloadMenuSaveCore(sender, e)
+    End Sub
+    Public Sub McDownloadMenuSaveCore(sender As Object, e As RoutedEventArgs, Optional ResumeTarget As String = Nothing)
         Dim Version As MyListItem
         If TypeOf sender Is MyListItem Then
             Version = sender
@@ -223,7 +230,7 @@ pause"
         Try
             Dim Id = Version.Title
             Dim JsonUrl = Version.Tag("url").ToString
-            Dim VersionFolder As String = Dialogs.SelectFolder("选择目标文件夹", False).FirstOrDefault
+            Dim VersionFolder As String = If(ResumeTarget, Dialogs.SelectFolder("选择目标文件夹", False).FirstOrDefault)
             If VersionFolder Is Nothing Then Return
             VersionFolder = VersionFolder & Id & "\"
 
@@ -248,6 +255,7 @@ pause"
 
             '启动
             Dim Loader As New LoaderCombo(Of String)("Minecraft " & Id & " 下载", Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "mc-jar"}, {"info", New JObject From {{"id", Id}, {"url", JsonUrl}}}, {"target", Path.GetDirectoryName(VersionFolder.TrimEnd("\"c)) & "\"}})
             Loader.Start(Id)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -322,9 +330,9 @@ pause"
 
 #Region "OptiFine 下载"
 
-    Private Sub McDownloadOptiFineSave(DownloadInfo As DlOptiFineListEntry)
+    Public Sub McDownloadOptiFineSave(DownloadInfo As DlOptiFineListEntry, Optional ResumeTarget As String = Nothing)
         Try
-            Dim Target As String = Dialogs.SaveFile("选择保存位置", DownloadInfo.FileName, filter:={("jar", "OptiFine Jar")})
+            Dim Target As String = If(ResumeTarget, Dialogs.SaveFile("选择保存位置", DownloadInfo.FileName, filter:={("jar", "OptiFine Jar")}))
             If Target Is Nothing Then Return
 
             '重复任务检查
@@ -335,6 +343,7 @@ pause"
             Next
 
             Dim Loader As New LoaderCombo(Of DlOptiFineListEntry)("OptiFine " & DownloadInfo.DisplayName & " 下载", McDownloadOptiFineSaveLoader(DownloadInfo, Target)) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "optifine"}, {"info", JObject.FromObject(DownloadInfo)}, {"target", Target}})
             Loader.Start(DownloadInfo)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -725,10 +734,10 @@ Retry:
 
 #Region "LiteLoader 下载"
 
-    Private Sub McDownloadLiteLoaderSave(DownloadInfo As DlLiteLoaderListEntry)
+    Public Sub McDownloadLiteLoaderSave(DownloadInfo As DlLiteLoaderListEntry, Optional ResumeTarget As String = Nothing)
         Try
             Dim Id As String = DownloadInfo.Inherit
-            Dim Target As String = Dialogs.SaveFile("选择保存位置", DownloadInfo.FileName.Replace("-SNAPSHOT", ""), filter:={("jar", "LiteLoader 安装器")})
+            Dim Target As String = If(ResumeTarget, Dialogs.SaveFile("选择保存位置", DownloadInfo.FileName.Replace("-SNAPSHOT", ""), filter:={("jar", "LiteLoader 安装器")}))
             If Target Is Nothing Then Return
 
             '重复任务检查
@@ -765,6 +774,7 @@ Retry:
             Loaders.Add(New LoaderDownload("下载主文件", New List(Of NetFile) From {New NetFile(Address.ToArray, Target, New FileChecker With {.MinSize = 1024 * 1024})}) With {.ProgressWeight = 15})
             '启动
             Dim Loader As New LoaderCombo(Of DlLiteLoaderListEntry)("LiteLoader " & Id & " 安装器下载", Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "liteloader"}, {"info", JObject.FromObject(DownloadInfo)}, {"target", Target}})
             Loader.Start(DownloadInfo)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -879,10 +889,10 @@ Retry:
 
 #Region "Forgelike 下载"
 
-    Public Sub McDownloadForgelikeSave(Info As DlForgelikeEntry)
+    Public Sub McDownloadForgelikeSave(Info As DlForgelikeEntry, Optional ResumeTarget As String = Nothing)
         Try
-            Dim Target As String = Dialogs.SaveFile("选择保存位置", $"{Info.LoaderName}-{Info.Inherit}-{Info.VersionName}.{Info.FileExtension}",
-                                            filter:={(Info.FileExtension, $"{Info.LoaderName} 安装器")})
+            Dim Target As String = If(ResumeTarget, Dialogs.SaveFile("选择保存位置", $"{Info.LoaderName}-{Info.Inherit}-{Info.VersionName}.{Info.FileExtension}",
+                                            filter:={(Info.FileExtension, $"{Info.LoaderName} 安装器")}))
             If Target Is Nothing Then Return
             Dim DisplayName As String = $"{Info.LoaderName} {Info.Inherit} - {Info.VersionName}"
 
@@ -917,6 +927,7 @@ Retry:
 
             '启动
             Dim Loader = New LoaderCombo(Of DlForgelikeEntry)(DisplayName & " 下载", Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "forgelike"}, {"info", JObject.FromObject(Info)}, {"target", Target}, {"neo", Info.IsNeoForge}})
             Loader.Start(Info)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -1577,12 +1588,12 @@ Retry:
 
 #Region "Fabric 下载"
 
-    Public Sub McDownloadFabricLoaderSave(DownloadInfo As JObject)
+    Public Sub McDownloadFabricLoaderSave(DownloadInfo As JObject, Optional ResumeTarget As String = Nothing)
         Try
             Dim Url As String = DownloadInfo("url").ToString
             Dim FileName As String = PathUtils.GetLastPart(Url)
             Dim Version As String = PathUtils.GetLastPart(DownloadInfo("version").ToString)
-            Dim Target As String = Dialogs.SaveFile("选择保存位置", FileName, filter:={("jar", "Fabric 安装器")})
+            Dim Target As String = If(ResumeTarget, Dialogs.SaveFile("选择保存位置", FileName, filter:={("jar", "Fabric 安装器")}))
             If Target Is Nothing Then Return
 
             '重复任务检查
@@ -1601,6 +1612,7 @@ Retry:
             Loaders.Add(New LoaderDownload("下载主文件", New List(Of NetFile) From {New NetFile(Address.ToArray, Target, New FileChecker With {.MinSize = 1024 * 64})}) With {.ProgressWeight = 15})
             '启动
             Dim Loader As New LoaderCombo(Of JObject)("Fabric " & Version & " 安装器下载", Loaders) With {.OnStateChanged = AddressOf LoaderStateChangedHintOnly}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "save"}, {"action", "fabric"}, {"info", DownloadInfo.DeepClone()}, {"target", Target}})
             Loader.Start(DownloadInfo)
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
@@ -1948,6 +1960,7 @@ Retry:
     Public Function McInstallStart(Request As McInstallRequest) As Boolean
         Try
             Dim Loader As New LoaderCombo(Of String)(Request.NewInstanceName & " 安装", McInstallLoadersGet(Request)) With {.OnStateChanged = AddressOf McInstallState}
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "install"}, {"request", JObject.FromObject(Request)}, {"folder", McFolderSelected}})
             '启动
             Loader.Start(Request.InstanceFolder)
             LoaderTaskbarAdd(Loader)
@@ -2050,6 +2063,7 @@ Retry:
                 Logger.Error("版本被其他 Worker 占用，版本修改失败")
                 Return False
             End If
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "modify"}, {"request", JObject.FromObject(Request)}, {"version", Instance.PathVersion}})
             LoaderTaskbarAdd(Loader)
             FrmMain.BtnExtraDownload.ShowRefresh()
             FrmMain.BtnExtraDownload.Ribble()
@@ -2134,7 +2148,7 @@ Retry:
                 Hint(Loader.Name & "成功！", HintType.Green)
                 'TODO: 自动选择安装成功的版本
             Case LoadState.Failed
-                MyMsgBox(Loader.Error.GetDisplay(True), Loader.Name & "失败", IsWarn:=True)
+                If Not CaumcTaskCenter.IsTracked(Loader) Then MyMsgBox(Loader.Error.GetDisplay(True), Loader.Name & "失败", IsWarn:=True)
             Case LoadState.Canceled
                 Hint(Loader.Name & "已取消！", HintType.Blue)
             Case LoadState.Loading
@@ -2143,7 +2157,26 @@ Retry:
         McInstallFailedClearFolder(Loader)
         LoaderFolderRun(McInstanceListLoader, McFolderSelected, LoaderFolderRunType.ForceRun, MaxDepth:=1, ExtraPath:="versions\")
     End Sub
+    Public Function CaumcRestartInstall(Request As McInstallRequest, Name As String) As LoaderCombo(Of String)
+        Dim VersionName = PathUtils.GetLastPart(Request.InstanceFolder)
+        If File.Exists(Path.Combine(Request.InstanceFolder, VersionName & ".json")) Then
+            Request.NewInstanceName = PCLCS.CAUMC.PclDataImport.UniqueInstanceName(Path.GetDirectoryName(Request.InstanceFolder.TrimEnd("\"c)), Request.NewInstanceName)
+            Request.InstanceFolder = Path.Combine(Path.GetDirectoryName(Request.InstanceFolder.TrimEnd("\"c)), Request.NewInstanceName) & "\"
+        End If
+        Dim Loader As New LoaderCombo(Of String)(Name, McInstallLoadersGet(Request)) With {.OnStateChanged = AddressOf McInstallState}
+        Loader.Start(Request.InstanceFolder)
+        LoaderTaskbarAdd(Loader)
+        Return Loader
+    End Function
+    Public Function CaumcRestartRepair(VersionPath As String, Name As String) As LoaderCombo(Of String)
+        Dim Instance As New McInstance(VersionPath)
+        Dim Loader As New LoaderCombo(Of String)(Name, DlClientFix(Instance, True, False))
+        Loader.Start(Instance.Name)
+        LoaderTaskbarAdd(Loader)
+        Return Loader
+    End Function
     Public Sub McInstallFailedClearFolder(Loader)
+        If CaumcTaskCenter.IsTracked(Loader) Then Return
         If Loader.State <> LoadState.Failed AndAlso Loader.State <> LoadState.Canceled Then Return
         RunInThread(
         Sub()

@@ -10,6 +10,9 @@ CAUMC 社区维护的 PCL 第三方修改版，基于龙腾猫跃的 [Plain Craf
 - 启动时询问新包；同名版本校验 Mod 内容后可关联，多项匹配只需选择一次。
 - 新包独立安装并保留旧版，批量处理后优先选中网页靠前的成功版本。
 - 统一玻璃界面，22 张社区截图每 5 秒轮播。
+- 统一任务中心，支持保存进度、继续下载、失败重试和后台运行。
+- 接入 CurseForge 官方 API，保留镜像与 Modrinth。
+- 默认游戏内存 6 GB，已有手动配置继续生效。
 - 保留游戏下载、整合包导入、Mod、版本管理、设置和诊断。
 
 ## 使用
@@ -18,7 +21,7 @@ Windows 10 / 11，需 .NET Framework 4.8。下载 EXE，放进一个文件夹运
 
 游戏目录和普通配置兼容原版 PCL。首次打开可导入旧游戏，之后也可从「版本选择」左侧底部进入。导入会复制文件并保留原游戏；账号缓存分别保存。
 
-微软登录等待 Minecraft AppID 审核；CurseForge 官方源待接入。
+微软登录等待 Minecraft AppID 审核。
 
 ## 构建
 
@@ -31,5 +34,7 @@ cd community-PCL-for-CAUMC
 ```
 
 产物：`dist/PCL for CAUMC.exe`。
+
+CurseForge 构建凭据使用 `PCL_BUILD_CF_API_KEY` 或本机 `.build/curseforge-api-key.txt`。
 
 基于 PCL `6b9a50d`（2.99.0.0）。许可见 [LICENCE](LICENCE)，组件署名见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。[支持原作者龙腾猫跃](https://meloong.com/afd/a/LTCat)。

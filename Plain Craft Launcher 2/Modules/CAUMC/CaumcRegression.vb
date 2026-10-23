@@ -3,6 +3,25 @@ Imports System.Reflection
 ' Called only by the explicit developer self-test entry point. All input is copied
 ' into the self-test's own game directory before any file operation is performed.
 Friend Module CaumcRegression
+    Friend Sub RunTaskCenterPreview(Results As List(Of String))
+        Dim Main = FrmMain
+        Dim OldLeft = Main.PanMainLeft.Child, OldRight = Main.PanMainRight.Child
+        Dim OldLeftWidth = Main.PanMainLeft.Width, OldRightWidth = Main.PanMainRight.Width
+        Dim OldLink = Main.BtnTitleSelect2.Visibility
+        Try
+            Main.BtnTitleSelect2.Visibility = Visibility.Collapsed
+            Main.PanMainLeft.Child = New PageSpeedLeft()
+            Dim Page As New PageSpeedRight()
+            Page.RefreshTasks()
+            Main.PanMainRight.Child = Page
+            RenderGlassFrame(1000, 640, 200, "tasks", Results)
+            RenderGlassFrame(774, 434, 170, "tasks-minimum", Results)
+        Finally
+            Main.PanMainLeft.Child = OldLeft : Main.PanMainRight.Child = OldRight
+            Main.PanMainLeft.Width = OldLeftWidth : Main.PanMainRight.Width = OldRightWidth
+            Main.BtnTitleSelect2.Visibility = OldLink
+        End Try
+    End Sub
     Friend Sub RunGlassPreviews(Results As List(Of String))
         RunPageEntryInteractionChecks(Results)
         ' Render the real window frame and real page controls without its Loaded

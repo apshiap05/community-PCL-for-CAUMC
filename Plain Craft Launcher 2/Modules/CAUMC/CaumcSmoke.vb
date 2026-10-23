@@ -1,4 +1,4 @@
-Imports PCLCS.CAUMC
+﻿Imports PCLCS.CAUMC
 Imports System.Reflection
 Imports System.Windows.Media.Imaging
 Imports System.Windows.Navigation
@@ -11,6 +11,11 @@ Public Module CaumcSmoke
             PathTemp = Paths.Base & "selftest-temp\"
             Directory.CreateDirectory(PathTemp & "Cache")
             CaumcInitialize()
+            If Environment.GetCommandLineArgs().Contains("--caumc-task-probe") Then
+                RunProcessProbe(Results)
+                File.WriteAllLines(Paths.Base & "task-process-result.txt", Results, New UTF8Encoding(False))
+                Return 0
+            End If
             RunCredentialConfigurationTests(Results)
             Using Stream = System.Windows.Application.GetResourceStream(New Uri("/Plain Craft Launcher 2;component/Images/Splash.png", UriKind.Relative)).Stream
                 Dim Splash = BitmapDecoder.Create(Stream, BitmapCreateOptions.PreservePixelFormat, BitmapCacheOption.OnLoad).Frames(0)
@@ -105,10 +110,13 @@ Public Module CaumcSmoke
             RunPackDownloadTests(Results)
             RunStartupPackTests(Results)
             RunPackBindingTests(Results)
+            RunTaskCenterTests(Results)
+            If File.Exists(Paths.Base & "curseforge-live-tests") Then RunCurseForgeLiveTests(Results)
             Results.Add("PASS 单 EXE 内嵌依赖装载")
             RunModpackIntegration(Results)
             CaumcRegression.RunFabric(Results)
             CaumcRegression.RunOnlineModUpdate(Results)
+            PrepareProcessProbe(Results)
             File.WriteAllLines(Paths.Base & "selftest-result.txt", Results, New UTF8Encoding(False))
             Return 0
         Catch ex As Exception
@@ -119,6 +127,172 @@ Public Module CaumcSmoke
             Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree("Software\PCLForCAUMCTest", False)
         End Try
     End Function
+
+    Private Sub PrepareProcessProbe(Results As List(Of String))
+        Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/task-large.bin")
+        Dim Loader As New LoaderCombo(Of String)("跨进程恢复测试", {New LoaderDownload("下载测试文件", {
+            New NetFile({Address.AbsoluteUri}, Paths.Base & "task-fixture\process.bin", New FileChecker With {.ActualSize = 4194304})})})
+        Loader.Start() : LoaderTaskbarAdd(Loader)
+        PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(15)
+            While Loader.Progress < 0.02
+                If DateTime.UtcNow > Deadline Then Throw New TimeoutException("跨进程样例未开始下载")
+                Thread.Sleep(10)
+            End While
+        End Sub))
+        CaumcTaskCenter.PreserveBeforeExit()
+        Loader.Cancel()
+        File.WriteAllText(Paths.Base & "task-process-probe.json", New JObject From {{"id", Loader.RecoveryId}, {"pid", Process.GetCurrentProcess().Id}}.ToString())
+        Dim Saved = (New TaskJournal(Paths.Base & "PCL\Tasks\tasks.json")).Find(Loader.RecoveryId)
+        Check(Saved.State = "interrupted" AndAlso Saved.Downloads.Count = 1, "退出前保存进行中的任务与可恢复下载进度", Results)
+    End Sub
+
+    Private Sub RunProcessProbe(Results As List(Of String))
+        FrmMain = New FormMain()
+        Dim Probe = JObject.Parse(File.ReadAllText(Paths.Base & "task-process-probe.json"))
+        Dim Id = CStr(Probe("id"))
+        Check(CInt(Probe("pid")) <> Process.GetCurrentProcess().Id, "在第二个独立 EXE 进程中验证恢复", Results)
+        Dim Item = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Id)
+        Check(Item.State = "interrupted" AndAlso Item.Progress > 0, "第二进程读取未完成任务，未自动开始下载", Results)
+        CaumcTaskCenter.ResumeTask(Id)
+        PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(25)
+            Do
+                Dim Saved = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Id)
+                If Saved.State = "succeeded" Then Exit Do
+                If Saved.State = "failed" Then Throw New IOException(Saved.Error)
+                If DateTime.UtcNow > Deadline Then Throw New TimeoutException("跨进程恢复未完成")
+                Thread.Sleep(20)
+            Loop
+        End Sub))
+        Dim Data = File.ReadAllBytes(Paths.Base & "task-fixture\process.bin")
+        Check(Data.Length = 4194304 AndAlso Data.All(Function(Value) Value = AscW("Q"c)), "第二进程继续下载并校验完整文件", Results)
+        CaumcTaskCenter.PreserveBeforeExit()
+    End Sub
+
+    Private Sub RunCurseForgeLiveTests(Results As List(Of String))
+        Dim Operation = System.Threading.Tasks.Task.Run(Sub()
+            Dim Search = NetRequestByClient("https://api.curseforge.com/v1/mods/search?gameId=432&classId=6&pageSize=1", RequireJson:=True).DeserializeJson(Of JObject)()
+            Check(CType(Search("data"), JArray).Count > 0, "真实 CurseForge 官方 API 搜索返回资源", Results)
+            Dim Files = NetRequestByClient("https://api.curseforge.com/v1/mods/238222/files?gameVersion=1.20.1&modLoaderType=1&pageSize=1", RequireJson:=True).DeserializeJson(Of JObject)()
+            Dim Entry = CType(Files("data"), JArray).First()
+            Dim Version = ResourceVersion.FromPlatformJson(CType(Entry, JObject), ResourceTypes.Mod)
+            Check(Version.DownloadAvailable AndAlso Version.Size > 0, "真实 CurseForge 文件元数据可用于原生下载", Results)
+            Dim Download = CStr(Entry("downloadUrl"))
+            If Not PCLCS.CAUMC.CurseForgeAccess.Trusted(New Uri(Download)) Then Throw New IOException("下载端点不在官方认证列表中")
+            Dim Target = Paths.Base & "task-fixture\curseforge-live.jar"
+            Dim Loader As New LoaderCombo(Of String)("CurseForge 官方下载验证", {New LoaderDownload("下载真实 Mod 文件", {
+                New NetFile({Download}, Target, New FileChecker With {.ActualSize = Version.Size, .Hash = Version.Hash})})})
+            Loader.Start() : LoaderTaskbarAdd(Loader)
+            Dim Deadline = DateTime.UtcNow.AddSeconds(60)
+            While Loader.State = LoadState.Loading OrElse Loader.State = LoadState.Waiting
+                If DateTime.UtcNow > Deadline Then Loader.Cancel() : Throw New TimeoutException("CurseForge 文件下载验证超时")
+                Thread.Sleep(30)
+            End While
+            If Loader.State <> LoadState.Finished Then Throw New IOException("CurseForge 下载验证失败", Loader.Error)
+            Check((New FileChecker With {.ActualSize = Version.Size, .Hash = Version.Hash}).Check(Target) Is Nothing, "真实官方 CDN 认证下载通过大小与哈希校验", Results)
+        End Sub)
+        PumpUntilComplete(Operation)
+        Operation.GetAwaiter().GetResult()
+    End Sub
+
+    Private Sub RunTaskCenterTests(Results As List(Of String))
+        Dim Request As New McInstallRequest With {.NewInstanceName = "fixture-fabric", .InstanceFolder = Paths.Base & ".minecraft\versions\fixture-fabric\",
+            .Components = New McComponents("1.21.1", Nothing, Nothing, Nothing, "0.17.3", Nothing, Nothing, Nothing)}
+        Dim Restored = CaumcTaskCenter.ReadInstallRequest(JObject.FromObject(Request))
+        Check(Restored.Components.MinecraftVersion = "1.21.1" AndAlso Restored.Components.ModLoaderVersions(ModLoaders.Fabric) = "0.17.3" AndAlso Restored.InstanceFolder = Request.InstanceFolder,
+            "安装请求持久化后保留游戏目录与加载器版本", Results)
+        Request.ForgeEntry = New DlForgeVersionEntry("47.4.28", Nothing, "1.20.1") With {.Category = "installer", .Hash = "test-hash"}
+        Restored = CaumcTaskCenter.ReadInstallRequest(JObject.FromObject(Request))
+        Check(Restored.ForgeEntry.VersionName = "47.4.28" AndAlso Restored.ForgeEntry.Category = "installer" AndAlso Restored.ForgeEntry.Hash = "test-hash", "恢复 Forge 下载元数据及校验规则", Results)
+        Check(Settings.Entries("LaunchRamType").DefaultValue.ToString() = "1" AndAlso Settings.Entries("LaunchRamCustom").DefaultValue.ToString() = "21", "默认使用自定义 6 GB 内存", Results)
+        Dim PackAddress As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/pack.zip?resource-recovery=1")
+        Dim Archive = Paths.Base & ".minecraft\versions\resource-probe\原始整合包.zip"
+        Dim PackTask As New TaskRecord With {.Name = "普通整合包恢复测试", .State = "interrupted", .Progress = 0.2,
+            .Recipe = New JObject From {{"type", "resource-pack"}, {"archive", Archive}, {"folder", CaumcGameDirectory}, {"temporary", True}, {"sourceName", "fixture-pack.zip"}},
+            .Downloads = New List(Of DownloadSpec) From {New DownloadSpec With {.Path = Archive, .Urls = {PackAddress.AbsoluteUri}, .MinSize = 22}}}
+        CaumcTaskCenter.SeedForTests(PackTask)
+        CaumcTaskCenter.ResumeTask(PackTask.Id)
+        PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(20)
+            Do
+                Dim Saved = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = PackTask.Id)
+                If Saved.State = "succeeded" Then Exit Do
+                If Saved.State = "failed" Then Throw New IOException(Saved.Error)
+                If DateTime.UtcNow > Deadline Then Throw New TimeoutException("普通整合包恢复超时")
+                Thread.Sleep(20)
+            Loop
+        End Sub))
+        Dim InstalledPack = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = PackTask.Id)
+        Dim InstalledVersion = CStr(InstalledPack.Recipe("version"))
+        Check(File.Exists(Path.Combine(InstalledVersion, "caumc-download-fixture.json")) AndAlso Not File.Exists(Archive), "普通整合包缺失 ZIP 时重新下载、完成导入并清理临时包", Results)
+        Check(File.ReadAllText(Path.Combine(InstalledVersion, "PCL", "CAUMC-source.json")).Contains("fixture-pack.zip"), "安装后的版本保留整合包来源信息", Results)
+        Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/task-large.bin")
+        Dim Target = Paths.Base & "task-fixture\download.bin"
+        Dim Loader As New LoaderCombo(Of String)("任务恢复测试", {New LoaderDownload("下载测试文件", {
+            New NetFile({Address.AbsoluteUri}, Target, New FileChecker With {.ActualSize = 4194304})})})
+        Loader.Start() : LoaderTaskbarAdd(Loader)
+        PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(15)
+            While Loader.Progress < 0.03
+                If DateTime.UtcNow > Deadline Then Throw New TimeoutException("测试文件未开始下载")
+                Thread.Sleep(10)
+            End While
+        End Sub))
+        CaumcTaskCenter.CheckpointNow()
+        Dim Item = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Loader.RecoveryId)
+        Check(CaumcTaskCenter.CanPause(Item), "文件下载阶段提供暂停操作", Results)
+        CaumcTaskCenter.StopTask(Item.Id, True)
+        PumpUntilComplete(System.Threading.Tasks.Task.Delay(350))
+        Check(CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Item.Id).State = "paused", "暂停不被原生取消回调覆盖", Results)
+        CaumcTaskCenter.ResumeTask(Item.Id)
+        PumpUntilComplete(System.Threading.Tasks.Task.Delay(180))
+        Check(CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Item.Id).State = "running", "当前会话继续任务时不被旧取消回调覆盖", Results)
+        CaumcTaskCenter.StopTask(Item.Id, True)
+        PumpUntilComplete(System.Threading.Tasks.Task.Delay(200))
+        CaumcTaskCenter.ReloadForTests()
+        Item = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Item.Id)
+        Dim ReloadedJournal As New TaskJournal(Paths.Base & "PCL\Tasks\tasks.json")
+        Check(Item.State = "paused" AndAlso ReloadedJournal.Find(Item.Id).Downloads.Count = 1 AndAlso Item.Progress > 0, "重建运行环境保留任务、下载路径和进度", Results)
+        CaumcTaskCenter.ResumeTask(Item.Id)
+        PumpUntilComplete(System.Threading.Tasks.Task.Run(Sub()
+            Dim Deadline = DateTime.UtcNow.AddSeconds(25)
+            Do
+                Dim Saved = CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Item.Id)
+                If Saved.State = "succeeded" Then Exit Do
+                If Saved.State = "failed" Then Throw New IOException(Saved.Error)
+                If DateTime.UtcNow > Deadline Then Throw New TimeoutException("恢复任务未完成")
+                Thread.Sleep(30)
+            Loop
+        End Sub))
+        Check(File.ReadAllBytes(Target).All(Function(Value) Value = AscW("Q"c)) AndAlso New FileInfo(Target).Length = 4194304, "真实 HTTP 暂停后恢复生成完整一致文件", Results)
+        Dim CancelTarget = Paths.Base & "task-fixture\cancel.bin"
+        Dim Canceled As New LoaderCombo(Of String)("取消任务测试", {New LoaderDownload("下载测试文件", {New NetFile({Address.AbsoluteUri}, CancelTarget)})})
+        Canceled.Start() : LoaderTaskbarAdd(Canceled)
+        PumpUntilComplete(System.Threading.Tasks.Task.Delay(80))
+        CaumcTaskCenter.StopTask(Canceled.RecoveryId, False)
+        PumpUntilComplete(System.Threading.Tasks.Task.Delay(250))
+        Dim Stored As New TaskJournal(Paths.Base & "PCL\Tasks\tasks.json")
+        Check(Not Stored.Find(Canceled.RecoveryId).NeedsAttention AndAlso Stored.Find(Canceled.RecoveryId).State = "canceled", "主动取消任务重启后不提示恢复", Results)
+        Dim Errors = 0
+        Dim Presenter = CaumcTaskCenter.FailurePresenter
+        Try
+            CaumcTaskCenter.FailurePresenter = Sub(Entry) Errors += 1
+            Dim Failure As New LoaderCombo(Of String)("失败任务测试", {New LoaderTask(Of String, Integer)("分析文件", Sub() Throw New IOException("fixture failure"))})
+            LoaderTaskbarAdd(Failure) : Failure.Start()
+            PumpUntilComplete(System.Threading.Tasks.Task.Delay(300))
+            CaumcTaskCenter.CheckpointNow()
+            PumpUntilComplete(System.Threading.Tasks.Task.Delay(100))
+            Check(CaumcTaskCenter.Snapshot().Single(Function(Entry) Entry.Id = Failure.RecoveryId).Error.Contains("fixture failure") AndAlso Errors = 1, "失败原因保留且只弹出一次失败说明", Results)
+        Finally
+            CaumcTaskCenter.FailurePresenter = Presenter
+        End Try
+        Dim Page As New PageSpeedRight()
+        Page.RefreshTasks()
+        Check(Page.PanMain.Children.Count >= 3, "统一任务中心保留完成、取消与失败记录", Results)
+        Check(FrmMain.BtnTitleTasks.Text = "任务" AndAlso FrmMain.BtnTitleTasks.Tag.ToString() = "6", "顶部任务入口与原任务管理使用同一页面编号", Results)
+        If File.Exists(Paths.Base & "layout-tests") Then CaumcRegression.RunTaskCenterPreview(Results)
+    End Sub
 
     Private Sub RunPackDownloadTests(Results As List(Of String))
         Dim Address As New Uri(New Uri(File.ReadAllText(Paths.Base & "auth-test-url.txt")), "/pack.zip?download=1")
@@ -331,6 +505,7 @@ Public Module CaumcSmoke
         Next
         Dim RuntimeId = Environment.GetEnvironmentVariable("PCL_MS_CLIENT_ID")
         Dim PreviousModSource = Settings.Get(Of Integer)("ToolDownloadMod")
+        Dim RuntimeCf = Environment.GetEnvironmentVariable("PCL_CF_API_KEY")
         Try
             Check(OAuthClientId = CaumcResolveMicrosoftClientId(), "微软登录实际采用当前构建配置", Results)
             Dim ExpectedFile = Paths.Base & "expected-ms-client-id.txt"
@@ -344,34 +519,30 @@ Public Module CaumcSmoke
             Environment.SetEnvironmentVariable("PCL_MS_CLIENT_ID", "  11111111-2222-4333-8444-555555555555  ")
             Check(CaumcResolveMicrosoftClientId() = "11111111-2222-4333-8444-555555555555", "运行时微软 Client ID 优先且去除首尾空白", Results)
 
-            For Each Address In {"https://api.curseforge.com/v1/mods", "http://api.curseforge.com/v1/mods",
-                                 "https://api.curseforge.com:8443/v1/mods", "https://user@api.curseforge.com/v1/mods",
-                                 "https://API.CURSEFORGE.COM./v1/mods"}
+            If File.Exists(Paths.Base & "curseforge-live-tests") Then Check(CaumcHasCurseForgeKey(), "构建包含可用的 CurseForge 项目凭据", Results)
+            Environment.SetEnvironmentVariable("PCL_CF_API_KEY", "fixture-api-key-not-a-real-credential")
+            For Each Address In {"https://api.curseforge.com/v1/mods", "https://edge.forgecdn.net/files/test.jar", "https://mediafilez.forgecdn.net/files/test.jar"}
                 Using Request As New HttpRequestMessage(HttpMethod.Get, Address)
-                    Dim Blocked = False
-                    Try
-                        SecretHeadersSign(Request.RequestUri.AbsoluteUri, Request)
-                    Catch ex As InvalidOperationException
-                        Blocked = ex.Message.Contains("已停用 CurseForge 官方接口")
-                    End Try
-                    Check(Blocked AndAlso Not Request.Headers.Contains("x-api-key"), "发送前阻止 CurseForge 官方 API 请求：" & Address, Results)
+                    SecretHeadersSign(Address, Request)
+                    Check(Request.Headers.Contains("x-api-key"), "官方 API 和 CDN 请求携带凭据：" & Address, Results)
                 End Using
             Next
-            For Each Address In {"https://mod.mcimirror.top/curseforge/v1/mods", "https://api.modrinth.com/v2/search",
-                                 "https://edge.forgecdn.net/files/test.jar", "https://example.invalid/?next=https://api.curseforge.com"}
+            For Each Address In {"http://api.curseforge.com/v1/mods", "https://api.curseforge.com:8443/v1/mods", "https://user@api.curseforge.com/v1/mods",
+                                 "https://mod.mcimirror.top/curseforge/v1/mods", "https://api.modrinth.com/v2/search", "https://api.curseforge.com.example.invalid/v1/mods"}
                 Using Request As New HttpRequestMessage(HttpMethod.Get, Address)
-                    SecretHeadersSign(Request.RequestUri.AbsoluteUri, Request)
-                    Check(Not Request.Headers.Contains("x-api-key"), "保留其他来源且不附带项目密钥：" & Address, Results)
+                    SecretHeadersSign(Address, Request)
+                    Check(Not Request.Headers.Contains("x-api-key"), "镜像、其他来源和非标准端点不携带项目凭据：" & Address, Results)
                 End Using
             Next
             For Each Preference In {0, 1, 2}
                 Settings.Set("ToolDownloadMod", Preference)
                 Dim Sources = DlModRequestSources("https://api.curseforge.com/v1/mods/search?searchFilter=a%20b&gameId=432")
-                Check(Sources.Count = 2 AndAlso Sources.All(Function(Source) Source.Url = "https://mod.mcimirror.top/curseforge/v1/mods/search?searchFilter=a%20b&gameId=432"),
-                    "所有下载源偏好均保留镜像重试且不回退 CurseForge 官方 API：" & Preference, Results)
+                Check(Sources.Any(Function(Source) Source.Url.StartsWith("https://api.curseforge.com/")) AndAlso Sources.Any(Function(Source) Source.Url.StartsWith("https://mod.mcimirror.top/")),
+                    "下载源偏好保留官方与镜像回退：" & Preference, Results)
             Next
         Finally
             Environment.SetEnvironmentVariable("PCL_MS_CLIENT_ID", RuntimeId)
+            Environment.SetEnvironmentVariable("PCL_CF_API_KEY", RuntimeCf)
             Settings.Set("ToolDownloadMod", PreviousModSource)
         End Try
     End Sub

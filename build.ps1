@@ -3,10 +3,28 @@ param(
     [string]$PackagesPath,
     [switch]$PortableMSBuild,
     [switch]$RunTests,
-    [string]$MicrosoftClientId = $env:PCL_BUILD_MS_CLIENT_ID
+    [string]$MicrosoftClientId = $env:PCL_BUILD_MS_CLIENT_ID,
+    [string]$CurseForgeKeyFile
 )
 $ErrorActionPreference = 'Stop'
 $sourceRoot = $PSScriptRoot
+if (-not $CurseForgeKeyFile) { $CurseForgeKeyFile = Join-Path $sourceRoot '.build/curseforge-api-key.txt' }
+$cfKey = $env:PCL_BUILD_CF_API_KEY
+if (-not $cfKey -and (Test-Path -LiteralPath $CurseForgeKeyFile)) { $cfKey = [IO.File]::ReadAllText($CurseForgeKeyFile).Trim() }
+$credentialResource = Join-Path $sourceRoot '.build/curseforge-key.bin'
+if ($cfKey) {
+    if ($cfKey.Length -lt 32 -or $cfKey -match '\s') { throw 'CurseForge API 凭据格式无效。' }
+    New-Item -ItemType Directory -Force (Split-Path $credentialResource) | Out-Null
+    $keyBytes = [Text.Encoding]::UTF8.GetBytes($cfKey)
+    $mask = New-Object byte[] $keyBytes.Length
+    $random = [Security.Cryptography.RandomNumberGenerator]::Create()
+    $random.GetBytes($mask); $random.Dispose()
+    $encoded = New-Object byte[] $keyBytes.Length
+    for ($index = 0; $index -lt $keyBytes.Length; $index++) { $encoded[$index] = $keyBytes[$index] -bxor $mask[$index] }
+    $writer = New-Object IO.BinaryWriter([IO.File]::Create($credentialResource))
+    try { $writer.Write([int]$keyBytes.Length); $writer.Write($mask); $writer.Write($encoded) } finally { $writer.Dispose() }
+} elseif (Test-Path -LiteralPath $credentialResource) { Remove-Item -LiteralPath $credentialResource }
+$cfKey = $null
 & (Join-Path $sourceRoot 'tools/compile-glass-shader.ps1') -SourceRoot $sourceRoot
 if (-not $PSBoundParameters.ContainsKey('MicrosoftClientId') -and [string]::IsNullOrWhiteSpace($MicrosoftClientId)) {
     [xml]$publicConfiguration = Get-Content -LiteralPath (Join-Path $sourceRoot 'tools/CaumcPublicConfiguration.props') -Raw

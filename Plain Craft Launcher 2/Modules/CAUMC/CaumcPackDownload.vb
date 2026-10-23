@@ -43,6 +43,8 @@ Public Module CaumcPackDownload
     Private Sub RememberBinding(Address As Uri, VersionPath As String, Signature As GuidePackSignature)
         If Not VersionExists(VersionPath) Then Throw New IOException("安装完成后未找到游戏版本，请查看下载任务。")
         Dim StoredPath = CompactVersionPath(VersionPath)
+        Directory.CreateDirectory(Path.Combine(VersionPath, "PCL"))
+        File.WriteAllText(Path.Combine(VersionPath, "PCL", "CAUMC-source.json"), New JObject From {{"name", Path.GetFileName(Uri.UnescapeDataString(Address.AbsolutePath))}}.ToString())
         SyncLock ImportedLock
             Dim Bindings = ReadBindings()
             Bindings(GuidePackUpdates.Key(Address)) = New JObject From {
@@ -177,7 +179,7 @@ Public Module CaumcPackDownload
         Dim Guide = GuideCatalog.ForPost(5)
         Dim Service As New ArticleClient(Http, Paths.Base & "PCL\Cache\pack-update-article.json", Guide.Source)
         Dim Snapshot = Await Service.RefreshAsync().ConfigureAwait(False)
-        Await GuidePackUpdates.CheckAsync(Snapshot, Http, AddressOf GuidePackImported, Ask,
+        Await GuidePackUpdates.CheckAsync(Snapshot, Http, Function(Address) GuidePackImported(Address) OrElse CaumcTaskCenter.HasPendingPack(Address), Ask,
             AddressOf DownloadUpdateAsync, AddressOf MarkGuidePackImported, selectPreferred:=AddressOf SelectGuidePack).ConfigureAwait(False)
     End Function
 
@@ -200,7 +202,7 @@ Public Module CaumcPackDownload
         Return Loader.State = LoadState.Finished
     End Function
 
-    Public Function DownloadGuidePack(Address As Uri, Optional DisplayName As String = Nothing) As LoaderCombo(Of String)
+    Public Function DownloadGuidePack(Address As Uri, Optional DisplayName As String = Nothing, Optional SavedArchive As String = Nothing) As LoaderCombo(Of String)
         If Not PclDataImport.IsPackLink(5, Address) Then Return Nothing
         Dim Folder = McFolderSelected
         Dim Key = Folder & "|" & GuidePackUpdates.Key(Address)
@@ -210,8 +212,17 @@ Public Module CaumcPackDownload
             Active.TryGetValue(Key, Existing)
             Return Existing
         End If
+        If SavedArchive Is Nothing Then
+            Dim Pending = CaumcTaskCenter.Snapshot().FirstOrDefault(Function(Item) Item.NeedsAttention AndAlso
+                CStr(Item.Recipe("type")) = "guide-pack" AndAlso CStr(Item.Recipe("url")) = GuidePackUpdates.Key(Address))
+            If Pending IsNot Nothing Then
+                CaumcTaskCenter.ResumeTask(Pending.Id)
+                RunInUi(Sub() FrmMain.PageChange(FormMain.PageType.TaskManager))
+                Return Nothing
+            End If
+        End If
         Dim FileName = If(DisplayName, Path.GetFileName(Uri.UnescapeDataString(Address.AbsolutePath)))
-        Dim DownloadPath = RequestTaskTempFolder() & "modpack.zip"
+        Dim DownloadPath = If(SavedArchive, Paths.Base & "PCL\Tasks\Packages\" & Guid.NewGuid().ToString("N") & ".zip")
         Dim Loader As New LoaderCombo(Of String)("下载并导入 " & FileName, {
             New LoaderDownload("下载整合包", New List(Of NetFile) From {
                 New NetFile(New String() {Address.AbsoluteUri}, DownloadPath, New FileChecker With {.MinSize = 22})
@@ -231,7 +242,10 @@ Public Module CaumcPackDownload
                         SelectGuidePack(Address)
                         Return
                     End If
-                    Dim Installation = ModpackInstall(DownloadPath, Automatic:=True, PreferredVersion:=Signature?.VersionName)
+                    Dim Installation As LoaderCombo(Of String)
+                    Using CaumcTaskCenter.Suppress(Task.RealParent)
+                        Installation = ModpackInstall(DownloadPath, Automatic:=True, PreferredVersion:=Signature?.VersionName)
+                    End Using
                     Try
                         Do While Installation.State = LoadState.Loading OrElse Installation.State = LoadState.Waiting
                             Task.CreateCancellationToken().ThrowIfCancellationRequested()
@@ -261,11 +275,32 @@ Public Module CaumcPackDownload
                                     CaumcTaskState(Item)
                                 End Sub
         If Not Active.TryAdd(Key, Loader) Then Return Nothing
+        CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "guide-pack"}, {"url", GuidePackUpdates.Key(Address)}, {"folder", Folder}, {"name", FileName}, {"archive", DownloadPath}})
         Loader.Start(Address.AbsoluteUri)
         LoaderTaskbarAdd(Loader)
         FrmMain.BtnExtraDownload.ShowRefresh()
         FrmMain.BtnExtraDownload.Ribble()
         Hint("开始下载整合包，下载完成后自动导入", HintType.Blue)
         Return Loader
+    End Function
+
+    Friend Function VersionTaskInfo(VersionPath As String) As String
+        Dim Labels As New List(Of String)()
+        SyncLock ImportedLock
+            If ReadBindings().Properties().Any(Function(Entry) PathUtils.IsSame(ExpandVersionPath(CStr(TryCast(Entry.Value, JObject)?("path"))), VersionPath)) Then Labels.Add("CAUMC 模组服 · 已关联")
+        End SyncLock
+        Dim Task = CaumcTaskCenter.Snapshot().FirstOrDefault(Function(Item) String.Equals(CStr(Item.Recipe("version"))?.TrimEnd("\"c), VersionPath.TrimEnd("\"c), StringComparison.OrdinalIgnoreCase) OrElse
+            String.Equals(CStr(Item.Recipe("request")?("InstanceFolder"))?.TrimEnd("\"c), VersionPath.TrimEnd("\"c), StringComparison.OrdinalIgnoreCase))
+        If Task IsNot Nothing Then Labels.Add(TaskJournal.StateText(Task.State))
+        Dim SourceFile = Path.Combine(VersionPath, "PCL", "CAUMC-source.json")
+        If File.Exists(SourceFile) Then
+            Try
+                Dim Source = JObject.Parse(File.ReadAllText(SourceFile))
+                Labels.Add("来源：" & CStr(Source("name")))
+            Catch ex As Exception
+                Logger.Warn(ex, "读取整合包来源失败")
+            End Try
+        End If
+        Return String.Join(" · ", Labels.Distinct())
     End Function
 End Module

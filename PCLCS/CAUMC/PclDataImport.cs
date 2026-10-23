@@ -28,7 +28,7 @@ public static class PclDataImport
     // Copy into a fresh folder, then publish it atomically. Existing instances,
     // world saves and configuration are never merged or replaced in place.
     public static string CopyGame(string sourceDirectory, string importsDirectory, CancellationToken token,
-        IProgress<PclImportProgress>? progress = null)
+        IProgress<PclImportProgress>? progress = null, string? checkpointId = null)
     {
         var source = Path.GetFullPath(sourceDirectory).TrimEnd(Path.DirectorySeparatorChar);
         var imports = Path.GetFullPath(importsDirectory).TrimEnd(Path.DirectorySeparatorChar);
@@ -43,11 +43,14 @@ public static class PclDataImport
         foreach (var invalid in Path.GetInvalidFileNameChars()) name = name.Replace(invalid, '_');
         var destination = Path.Combine(imports, name);
         for (var i = 2; Directory.Exists(destination) || File.Exists(destination); i++) destination = Path.Combine(imports, name + " (" + i + ")");
-        var staging = Path.Combine(imports, ".import-" + Guid.NewGuid().ToString("N"));
+        if (checkpointId != null && !Guid.TryParseExact(checkpointId, "N", out _)) throw new ArgumentException("无效的导入恢复编号");
+        var staging = Path.Combine(imports, ".import-" + (checkpointId ?? Guid.NewGuid().ToString("N")));
+        var resume = Path.Combine(staging, ".resume");
         long copied = 0;
         try
         {
             Directory.CreateDirectory(Path.Combine(staging, ".minecraft", "versions"));
+            if (checkpointId != null) Directory.CreateDirectory(resume);
             var buffer = new byte[1024 * 1024];
             foreach (var file in files)
             {
@@ -55,9 +58,21 @@ public static class PclDataImport
                 var relative = file.Substring(source.Length + 1);
                 var target = Path.Combine(staging, ".minecraft", relative);
                 Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+                var sourceInfo = new FileInfo(file);
+                long offset = 0;
+                if (checkpointId != null) {
+                    using var sha = System.Security.Cryptography.SHA256.Create();
+                    var key = BitConverter.ToString(sha.ComputeHash(Encoding.UTF8.GetBytes(relative))).Replace("-", "");
+                    var stampFile = Path.Combine(resume, key);
+                    var stamp = sourceInfo.Length + ":" + sourceInfo.LastWriteTimeUtc.Ticks;
+                    if (File.Exists(stampFile) && File.ReadAllText(stampFile) == stamp && File.Exists(target) && new FileInfo(target).Length <= sourceInfo.Length)
+                        offset = new FileInfo(target).Length;
+                    File.WriteAllText(stampFile, stamp);
+                }
                 using (var input = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.Read))
-                using (var output = new FileStream(target, FileMode.CreateNew, FileAccess.Write))
+                using (var output = new FileStream(target, offset > 0 ? FileMode.Open : FileMode.Create, FileAccess.Write))
                 {
+                    input.Position = offset; output.Position = offset; copied += offset;
                     int size;
                     while ((size = input.Read(buffer, 0, buffer.Length)) > 0)
                     {
@@ -70,12 +85,18 @@ public static class PclDataImport
                 File.SetLastWriteTimeUtc(target, File.GetLastWriteTimeUtc(file));
             }
             token.ThrowIfCancellationRequested();
+            if (Directory.Exists(resume)) Directory.Delete(resume, true);
+            if (checkpointId != null) {
+                var expected = new HashSet<string>(files.Select(f => f.Substring(source.Length + 1)), StringComparer.OrdinalIgnoreCase);
+                foreach (var stale in Directory.GetFiles(Path.Combine(staging, ".minecraft"), "*", SearchOption.AllDirectories))
+                    if (!expected.Contains(stale.Substring(Path.Combine(staging, ".minecraft").Length + 1))) File.Delete(stale);
+            }
             Directory.Move(staging, destination);
             return Path.Combine(destination, ".minecraft") + Path.DirectorySeparatorChar;
         }
         finally
         {
-            if (Directory.Exists(staging) && ContainsPath(imports, staging)) Directory.Delete(staging, true);
+            if (checkpointId == null && Directory.Exists(staging) && ContainsPath(imports, staging)) Directory.Delete(staging, true);
         }
     }
 

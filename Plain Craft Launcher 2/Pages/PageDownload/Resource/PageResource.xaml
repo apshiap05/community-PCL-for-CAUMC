@@ -8,7 +8,7 @@
       VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
     <StackPanel Orientation="Vertical" Margin="25">
         <local:MyHint x:Name="HintCurseForgeApi" Theme="Blue" Margin="0,0,0,15" Visibility="Collapsed"
-                      Text="CurseForge 官方 API 申请中，申请完成后将更新此源。&#xa;当前 CurseForge 请求使用镜像源，也可选择 Modrinth 下载。" />
+                      Text="此构建未配置 CurseForge 官方接口，可使用镜像源或 Modrinth。" />
         <local:MyCard Title="搜索XXX" Margin="0,0,0,15" x:Name="PanAlways">
             <StackPanel Margin="25,40,25,15">
                 <Grid Margin="0,0,0,11" HorizontalAlignment="Stretch">

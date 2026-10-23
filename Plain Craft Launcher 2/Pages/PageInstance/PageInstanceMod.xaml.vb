@@ -612,6 +612,12 @@ Install:
             '结束处理
             Dim Loader As New LoaderCombo(Of IEnumerable(Of LocalResourceFile))("Mod 更新：" & PageInstanceLeft.Instance.Name, InstallLoaders)
             Dim PathMods As String = PageInstanceLeft.Instance.PathIndie & "mods\"
+            Dim Originals As New JObject()
+            For Each Entry In ModList
+                If Entry.File.Exists Then Originals(Entry.File.FullName) = CaumcTaskCenter.FileHash(Entry.File.FullName)
+            Next
+            CaumcTaskCenter.Recipe(Loader, New JObject From {{"type", "mod-update"}, {"version", PageInstanceLeft.Instance.PathVersion}, {"mods", PathMods},
+                {"copies", JObject.FromObject(FileCopyList)}, {"originals", Originals}})
             Loader.OnStateChanged =
             Sub()
                 '结果提示

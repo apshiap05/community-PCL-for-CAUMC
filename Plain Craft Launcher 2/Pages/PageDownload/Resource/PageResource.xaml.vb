@@ -56,7 +56,7 @@ Public Class PageResource
             If _Type = Value Then Return
             _Type = Value
             BtnSearchInstallModPack.Visibility = If(Value = ResourceTypes.ModPack, Visibility.Visible, Visibility.Collapsed)
-            HintCurseForgeApi.Visibility = If(Value = ResourceTypes.Mod, Visibility.Visible, Visibility.Collapsed)
+            HintCurseForgeApi.Visibility = If(Not CaumcHasCurseForgeKey(), Visibility.Visible, Visibility.Collapsed)
         End Set
     End Property
     Private _Type As ResourceTypes = -1

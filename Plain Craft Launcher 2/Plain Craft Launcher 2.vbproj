@@ -216,6 +216,7 @@
     <Compile Include="Modules\CAUMC\CaumcGlass.vb" />
     <Compile Include="Modules\CAUMC\CaumcMigration.vb" />
     <Compile Include="Modules\CAUMC\CaumcPackDownload.vb" />
+    <Compile Include="Modules\CAUMC\CaumcTaskCenter.vb" />
     <Compile Include="Modules\CAUMC\CaumcGlassEffect.vb" />
     <Compile Include="Modules\CAUMC\CaumcPhotoBackdrop.vb" />
     <Compile Include="Modules\CAUMC\CaumcHomepage.vb" />
@@ -966,6 +967,11 @@
     <Resource Include="Images\Heads\ChongQing.png" />
     <Resource Include="Images\Heads\HerobrineXia.png" />
 
+  </ItemGroup>
+  <ItemGroup Condition="Exists('..\.build\curseforge-key.bin')">
+    <EmbeddedResource Include="..\.build\curseforge-key.bin">
+      <LogicalName>CAUMC.CurseForgeKey</LogicalName>
+    </EmbeddedResource>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.VisualBasic.targets" />
   <Import Project="..\tools\CaumcBuildMetadata.targets" />

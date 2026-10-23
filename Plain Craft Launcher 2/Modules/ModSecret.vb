@@ -24,6 +24,32 @@ Friend Module ModSecret
             Address.Host.TrimEnd("."c).Equals("api.curseforge.com", StringComparison.OrdinalIgnoreCase)
     End Function
 
+    Private ReadOnly CurseForgeKey As New Lazy(Of String)(Function()
+        Using Stream = Reflection.Assembly.GetExecutingAssembly().GetManifestResourceStream("CAUMC.CurseForgeKey")
+            If Stream Is Nothing Then Return ""
+            Using Reader As New BinaryReader(Stream)
+                Dim Size = Reader.ReadInt32()
+                If Size < 16 OrElse Size > 1024 Then Return ""
+                Dim Mask = Reader.ReadBytes(Size), Encoded = Reader.ReadBytes(Size)
+                If Mask.Length <> Size OrElse Encoded.Length <> Size Then Return ""
+                For Index = 0 To Size - 1
+                    Encoded(Index) = Encoded(Index) Xor Mask(Index)
+                Next
+                Return Encoding.UTF8.GetString(Encoded)
+            End Using
+        End Using
+    End Function)
+    Friend Function CaumcResolveCurseForgeKey() As String
+        Dim Runtime = Environment.GetEnvironmentVariable("PCL_CF_API_KEY")
+        Return If(String.IsNullOrWhiteSpace(Runtime), CurseForgeKey.Value, Runtime.Trim())
+    End Function
+    Friend Function CaumcHasCurseForgeKey() As Boolean
+        Return Not String.IsNullOrEmpty(CaumcResolveCurseForgeKey())
+    End Function
+    Friend Function CaumcSendAsync(Client As HttpClient, Request As HttpRequestMessage, Token As CancellationToken) As System.Threading.Tasks.Task(Of HttpResponseMessage)
+        Return PCLCS.CAUMC.CurseForgeAccess.SendAsync(Client, Request, CaumcResolveCurseForgeKey(), Token)
+    End Function
+
 #Region "网络鉴权"
 
     ' CAUMC retains upstream game downloads and modpack import as requested.
@@ -37,8 +63,9 @@ Friend Module ModSecret
     ''' </summary>
     Friend Sub SecretHeadersSign(Url As String, ByRef Req As HttpRequestMessage, Optional SimulateBrowserHeaders As Boolean = False)
         If CaumcIsCurseForgeApi(Req.RequestUri) Then
-            Throw New InvalidOperationException("PCL for CAUMC 已停用 CurseForge 官方接口，请使用 Modrinth 或镜像源。")
+            If Not CaumcHasCurseForgeKey() Then Throw New InvalidOperationException("此构建未配置 CurseForge 官方接口，可使用镜像源或 Modrinth。")
         End If
+        PCLCS.CAUMC.CurseForgeAccess.Sign(Req, CaumcResolveCurseForgeKey())
         If Not Req.Headers.UserAgent.Any Then
             If Url.Contains("baidupcs.com") OrElse Url.Contains("baidu.com") Then
                 Req.Headers.Add("User-Agent", "LogStatistic")  '#4951
